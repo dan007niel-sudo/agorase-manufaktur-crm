@@ -7,6 +7,14 @@ const currentDir = dirname(fileURLToPath(import.meta.url))
 
 export async function runMigrations(pool: DbPool | null) {
   if (!pool) return
-  const sql = await readFile(join(currentDir, 'schema.sql'), 'utf8')
+  const sql = await readSchemaSql()
   await pool.query(sql)
+}
+
+async function readSchemaSql() {
+  try {
+    return await readFile(join(currentDir, 'schema.sql'), 'utf8')
+  } catch {
+    return readFile(join(currentDir, '../../src/db/schema.sql'), 'utf8')
+  }
 }
