@@ -171,12 +171,12 @@ Set root `package.json` to:
     "dev": "npm run dev -w @agorase/web",
     "dev:web": "npm run dev -w @agorase/web",
     "dev:api": "npm run dev -w @agorase/api",
-    "build": "npm run build -w @agorase/shared && npm run build -w @agorase/api --if-present && npm run build -w @agorase/web",
+    "build": "npm run build -w @agorase/shared && npm run build -w @agorase/web",
     "build:web": "npm run build -w @agorase/web",
     "build:api": "npm run build -w @agorase/api",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "npm run typecheck -w @agorase/shared && npm run typecheck -w @agorase/api --if-present && npm run typecheck -w @agorase/web",
+    "typecheck": "npm run typecheck -w @agorase/shared && npm run typecheck -w @agorase/web",
     "preview": "npm run preview -w @agorase/web"
   },
   "devDependencies": {
@@ -669,6 +669,19 @@ Create `apps/api/tsconfig.json`:
     "types": ["node"]
   },
   "include": ["src"]
+}
+```
+
+- [ ] **Step 1b: Add API to root verification scripts**
+
+After `apps/api/package.json` exists, update the root `package.json` scripts:
+
+```json
+{
+  "scripts": {
+    "build": "npm run build -w @agorase/shared && npm run build -w @agorase/api && npm run build -w @agorase/web",
+    "typecheck": "npm run typecheck -w @agorase/shared && npm run typecheck -w @agorase/api && npm run typecheck -w @agorase/web"
+  }
 }
 ```
 
