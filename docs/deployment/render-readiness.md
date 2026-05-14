@@ -1,15 +1,14 @@
 # Render Deployment Readiness
 
-Status: waiting for the Phase 1 monorepo/API structure to merge.
+Status: ready for Render Blueprint setup after local verification.
 
-This note captures the Render settings to apply after the repository contains:
+This note captures the Render settings for the current Phase 1 monorepo:
 
 - `apps/web` for the React/Vite frontend
 - `apps/api` for the secure Node API service
 - `packages/shared` for shared TypeScript contracts
 - root npm workspace scripts such as `build:web`, `build:api`, `typecheck`, and `test`
-
-Do not add `render.yaml` until those paths and scripts exist on the deployment branch.
+- root `render.yaml` with one API Web Service and one Static Site
 
 ## Web: Render Static Site
 
@@ -42,6 +41,7 @@ Recommended service:
 - Build command: `npm install && npm run build:api`
 - Start command: `npm run start -w @agorase/api`
 - Node version: `24`
+- Region: `frankfurt`
 - Health check path: `/api/health`, if implemented by the API branch
 - Plan: choose the smallest plan that supports expected API latency and traffic; `starter` is the planned default
 
@@ -109,9 +109,9 @@ Without this, direct visits to client routes such as `/partners`, `/creative-lab
 - API error responses should normalize provider failures and avoid returning raw provider metadata that might include sensitive request details.
 - Provider model IDs should remain server-side configuration, not hard-coded into React components.
 
-## Post-Merge Verification Checklist
+## Pre-Deploy Verification Checklist
 
-Run these checks after the monorepo/API branches have merged and before creating `render.yaml`:
+Run these checks before connecting or syncing the Render Blueprint:
 
 - `git status --short` shows only intentional deployment-doc/config changes.
 - `test -d apps/web && test -d apps/api && test -d packages/shared`
@@ -140,4 +140,8 @@ rg 'openaiApiKey|Authorization: `Bearer|VITE_.*KEY|localStorage.*apiKey|GEMINI_A
 - Confirm provider errors are redacted before they reach browser responses or Render logs intended for routine diagnostics.
 - Confirm deployment logs do not print full request bodies, API keys, Authorization headers, provider raw responses, or environment dumps.
 
-After those checks pass, create `render.yaml` or configure the two Render services manually with the settings above.
+## Blueprint Setup Notes
+
+- Keep `GEMINI_API_KEY` and `ALLOWED_ORIGINS` as `sync: false` values and enter them during the initial Render Blueprint creation flow.
+- Render ignores `sync: false` values when updating an existing Blueprint, so add any new secrets manually to existing services.
+- Use a single Blueprint to manage these services to avoid configuration drift between multiple Blueprint syncs.

@@ -2,13 +2,14 @@ services:
   - type: web
     name: agorase-fashion-os-api
     runtime: node
+    region: frankfurt
     plan: starter
     buildCommand: npm install && npm run build:api
     startCommand: npm run start -w @agorase/api
     healthCheckPath: /api/health
     envVars:
       - key: NODE_VERSION
-        value: 24
+        value: "24"
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_TEXT_MODEL
@@ -29,6 +30,6 @@ services:
         destination: /index.html
     envVars:
       - key: NODE_VERSION
-        value: 24
+        value: "24"
       - key: VITE_API_BASE_URL
         sync: false
