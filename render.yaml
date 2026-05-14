@@ -18,6 +18,10 @@ services:
         value: gemini-3-pro-image-preview
       - key: ALLOWED_ORIGINS
         sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: agorase-fashion-os-db
+          property: connectionString
 
   - type: web
     name: agorase-fashion-os-web
@@ -33,3 +37,10 @@ services:
         value: "24"
       - key: VITE_API_BASE_URL
         sync: false
+
+databases:
+  - name: agorase-fashion-os-db
+    region: frankfurt
+    plan: basic-256mb
+    databaseName: agorase_fashion_os
+    postgresMajorVersion: "18"

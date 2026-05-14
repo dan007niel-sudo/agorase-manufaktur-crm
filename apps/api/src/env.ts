@@ -4,6 +4,7 @@ export interface ApiEnv {
   geminiTextModel: string
   geminiImageModel: string
   allowedOrigins: string[]
+  databaseUrl: string
 }
 
 export function readEnv(source: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env): ApiEnv {
@@ -16,5 +17,6 @@ export function readEnv(source: NodeJS.ProcessEnv | Record<string, string | unde
       .split(',')
       .map((origin) => origin.trim())
       .filter(Boolean),
+    databaseUrl: source.DATABASE_URL || '',
   }
 }

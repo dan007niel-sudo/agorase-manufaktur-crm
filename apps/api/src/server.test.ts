@@ -45,6 +45,10 @@ describe('API server', () => {
     ).toContain('Agorase Fashion OS')
   })
 
+  it('reads the database URL from server-only env', () => {
+    expect(readEnv({ DATABASE_URL: 'postgresql://example/internal' }).databaseUrl).toBe('postgresql://example/internal')
+  })
+
   it('uses allow-listed origins for CORS responses', async () => {
     const response = await handleRequest(
       new Request('http://localhost/api/health', {
