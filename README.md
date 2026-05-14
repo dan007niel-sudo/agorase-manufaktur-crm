@@ -51,6 +51,8 @@ Deploy the frontend as a Render Static Site from `apps/web/dist`. Deploy the bac
 
 The repository includes a Render Blueprint at `render.yaml`.
 
+Phase 2A also provisions Render Postgres through `render.yaml`. The API receives `DATABASE_URL` from the database's internal connection string via `fromDatabase`; the web service never receives database credentials.
+
 - GitHub repo: `https://github.com/dan007niel-sudo/agorase-manufaktur-crm`
 - Blueprint start link: `https://render.com/deploy?repo=https://github.com/dan007niel-sudo/agorase-manufaktur-crm`
 
@@ -61,6 +63,7 @@ Recommended API settings:
 - Health check path: `/api/health`
 - Secret env: `GEMINI_API_KEY`
 - CORS env: `ALLOWED_ORIGINS=https://your-static-site.onrender.com`
+- Database env: `DATABASE_URL` from `agorase-fashion-os-db`
 
 Recommended web settings:
 
