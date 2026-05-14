@@ -60,7 +60,7 @@ The API service owns all provider calls that require secrets. Browser code shoul
 Required:
 
 - `GEMINI_API_KEY`: Google Gemini API key. Set as a secret in Render.
-- `ALLOWED_ORIGIN`: deployed Static Site origin, for example `https://agorase-fashion-os-web.onrender.com`. Do not use `*` in production.
+- `ALLOWED_ORIGINS`: deployed Static Site origin, for example `https://agorase-fashion-os-web.onrender.com`. Use a comma-separated list only when more than one trusted origin is required. Do not use `*` in production.
 
 Supported fallback/optional variables:
 
@@ -104,7 +104,7 @@ Without this, direct visits to client routes such as `/partners`, `/creative-lab
 - No Gemini credentials should appear in Vite env vars because `VITE_*` variables are exposed to client bundles.
 - The frontend must not store provider keys in localStorage, sessionStorage, IndexedDB, committed files, or browser-accessible settings.
 - Production browser requests should target `VITE_API_BASE_URL`; do not rely on a Static Site `/api` proxy unless an external rewrite/proxy has been deliberately configured and verified.
-- `ALLOWED_ORIGIN` should be the deployed Static Site URL in production, not `*`.
+- `ALLOWED_ORIGINS` should include the deployed Static Site URL in production, not `*`.
 - API routes should validate request bodies before provider calls.
 - API error responses should normalize provider failures and avoid returning raw provider metadata that might include sensitive request details.
 - Provider model IDs should remain server-side configuration, not hard-coded into React components.
@@ -134,7 +134,7 @@ rg 'openaiApiKey|Authorization: `Bearer|VITE_.*KEY|localStorage.*apiKey|GEMINI_A
 - Confirm production web config uses `VITE_API_BASE_URL` for the deployed API origin.
 - Confirm `VITE_API_PROXY_TARGET`, if present, is documented and used only for local development.
 - Confirm the Static Site is not relying on an implicit `/api` proxy to reach the backend.
-- Confirm the API service has `ALLOWED_ORIGIN` set to the exact deployed Static Site URL, not `*`.
+- Confirm the API service has `ALLOWED_ORIGINS` set to the exact deployed Static Site URL, not `*`.
 - Confirm the API health endpoint returns provider readiness without exposing secret values.
 - Confirm browser requests go to the deployed API service, not directly to Google provider endpoints.
 - Confirm provider errors are redacted before they reach browser responses or Render logs intended for routine diagnostics.
