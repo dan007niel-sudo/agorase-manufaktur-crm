@@ -1,4 +1,7 @@
 import { readEnv, type ApiEnv } from './env.js'
+import { createDbPool } from './db/client.js'
+import { runMigrations } from './db/migrate.js'
+import { createPostgresPartnersRepository } from './db/partnersRepository.js'
 import { errorResponse, jsonResponse, resolveOrigin } from './http.js'
 import { healthRoute } from './routes/health.js'
 import { mockupsRoute } from './routes/mockups.js'
@@ -40,6 +43,12 @@ function toContext(contextOrEnv: ApiEnv | ApiContext): ApiContext {
 const env = readEnv()
 
 if (process.env.NODE_ENV !== 'test') {
+  const pool = createDbPool(env)
+  await runMigrations(pool)
+  const context: ApiContext = {
+    env,
+    partnersRepository: pool ? createPostgresPartnersRepository(pool) : undefined,
+  }
   const server = await import('node:http')
   server
     .createServer(async (incoming, outgoing) => {
@@ -53,7 +62,7 @@ if (process.env.NODE_ENV !== 'test') {
           body: chunks.length ? Buffer.concat(chunks) : undefined,
           duplex: chunks.length ? 'half' : undefined,
         } as RequestInit)
-        const response = await handleRequest(request, env)
+        const response = await handleRequest(request, context)
         outgoing.writeHead(response.status, Object.fromEntries(response.headers.entries()))
         outgoing.end(await response.text())
       })
@@ -61,4 +70,9 @@ if (process.env.NODE_ENV !== 'test') {
     .listen(env.port, () => {
       console.log(`Agorase API listening on ${env.port}`)
     })
+
+  process.on('SIGTERM', async () => {
+    await pool?.end()
+    process.exit(0)
+  })
 }
