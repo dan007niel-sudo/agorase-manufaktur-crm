@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { buildAiResearchPrompt, parseAiResearchResponse, suggestionToManufacture } from './aiResearch'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { buildAiResearchPrompt, parseAiResearchResponse, requestAiManufactories, suggestionToManufacture } from './aiResearch'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 describe('buildAiResearchPrompt', () => {
   it('turns research criteria into an Agorase-specific search brief', () => {
@@ -92,6 +96,29 @@ describe('parseAiResearchResponse', () => {
       source: 'KI-Recherche',
       nextStep: 'Line Sheet oder Wholesale-Kontakt prüfen',
     })
+  })
+})
+
+describe('requestAiManufactories', () => {
+  it('uses the Render-compatible trailing slash research endpoint', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ suggestions: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+
+    await requestAiManufactories({
+      criteria: {
+        categories: [],
+        regions: 'Portugal',
+        productFocus: 'premium knitwear',
+        priceLevel: 'Premium',
+        count: 1,
+      },
+    })
+
+    expect(fetchSpy).toHaveBeenCalledWith('/api/research/partners/', expect.any(Object))
   })
 })
 

@@ -8,12 +8,13 @@ import { visualizeRoute } from './routes/visualize.js'
 export async function handleRequest(request: Request, env = readEnv()) {
   const url = new URL(request.url)
   const origin = resolveOrigin(request, env.allowedOrigins)
+  const pathname = url.pathname.replace(/\/$/, '')
 
   if (request.method === 'OPTIONS') return jsonResponse({}, 204, origin)
-  if (url.pathname === '/api/health' && request.method === 'GET') return healthRoute(request, env)
-  if (url.pathname === '/api/research/partners' && request.method === 'POST') return researchRoute(request, env)
-  if (url.pathname === '/api/visualize' && request.method === 'POST') return visualizeRoute(request, env)
-  if (url.pathname === '/api/mockups/generate' && request.method === 'POST') return mockupsRoute(request, env)
+  if (pathname === '/api/health' && request.method === 'GET') return healthRoute(request, env)
+  if (pathname === '/api/research/partners' && request.method === 'POST') return researchRoute(request, env)
+  if (pathname === '/api/visualize' && request.method === 'POST') return visualizeRoute(request, env)
+  if (pathname === '/api/mockups/generate' && request.method === 'POST') return mockupsRoute(request, env)
 
   return errorResponse('not_found', 'Route not found', 404, origin)
 }

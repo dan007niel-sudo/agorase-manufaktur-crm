@@ -109,6 +109,25 @@ describe('API server', () => {
     expect((init?.headers as Record<string, string>)['x-goog-api-key']).toBe('test-secret')
   })
 
+  it('accepts trailing slash research requests', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"suggestions":[]}' }] } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/research/partners/', {
+        method: 'POST',
+        body: JSON.stringify({ count: 3, categories: [], regions: '', productFocus: '', priceLevel: 'Alle' }),
+      }),
+      readEnv({ GEMINI_API_KEY: 'test-secret' }),
+    )
+
+    expect(response.status).toBe(200)
+  })
+
   it('hides provider error details from frontend responses', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ error: { message: 'raw provider secret failure' } }), {
