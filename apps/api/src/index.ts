@@ -27,7 +27,8 @@ if (process.env.NODE_ENV !== 'test') {
       const chunks: Buffer[] = []
       incoming.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
       incoming.on('end', async () => {
-        const request = new Request(`http://localhost${incoming.url || '/'}`, {
+        const host = incoming.headers.host || `localhost:${env.port}`
+        const request = new Request(`http://${host}${incoming.url || '/'}`, {
           method: incoming.method,
           headers: incoming.headers as HeadersInit,
           body: chunks.length ? Buffer.concat(chunks) : undefined,
