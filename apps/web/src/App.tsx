@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import logo from './assets/agorase-logo.jpeg'
 import './App.css'
-import { seedManufactories, seedTemplates } from './data'
+import { seedManufactories } from './data'
 import {
   calculateMetrics,
   createEmptyManufacture,
@@ -17,7 +17,6 @@ import {
   type CrmTask,
   type Manufactory,
   type PipelineStatus,
-  type Template,
 } from './types'
 import {
   requestAiManufactories,
@@ -25,28 +24,14 @@ import {
   type AiResearchCriteria,
   type AiResearchSuggestion,
 } from './aiResearch'
+import { fashionOsModules, type FashionOsModule } from './fashionOs'
 
-const sections = [
-  'Dashboard',
-  'Fashion-Liste',
-  'Pipeline',
-  'Kontakte',
-  'Follow-ups',
-  'Aufgaben',
-  'Kategorien',
-  'Potenzial',
-  'KI-Recherche',
-  'Vorlagen',
-  'Bulk-Import',
-] as const
-
-type Section = (typeof sections)[number]
+type Section = FashionOsModule['section']
 
 const storageKeys = {
   records: 'agorase.records',
   templates: 'agorase.templates',
   completedTasks: 'agorase.completedTasks',
-  apiKey: 'agorase.openaiApiKey',
 }
 
 function App() {
@@ -55,9 +40,8 @@ function App() {
     window.history.replaceState({}, '', window.location.pathname)
   }
 
-  const [activeSection, setActiveSection] = useState<Section>('Dashboard')
+  const [activeSection, setActiveSection] = useState<Section>('Command Center')
   const [records, setRecords] = useLocalState<Manufactory[]>(storageKeys.records, seedManufactories)
-  const [templates, setTemplates] = useLocalState<Template[]>(storageKeys.templates, seedTemplates)
   const [completedTasks, setCompletedTasks] = useLocalState<string[]>(storageKeys.completedTasks, [])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
@@ -96,6 +80,7 @@ function App() {
     ...task,
     completed: completedTasks.includes(task.id),
   }))
+  const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
 
   function saveRecord(nextRecord: Manufactory) {
     setRecords((current) => upsertManufacture(current, nextRecord))
@@ -119,6 +104,7 @@ function App() {
       <Sidebar activeSection={activeSection} onSelect={setActiveSection} metrics={metrics.openTasks} />
       <main className="workspace">
         <Topbar
+          activeModule={activeModule}
           query={query}
           categoryFilter={categoryFilter}
           statusFilter={statusFilter}
@@ -130,16 +116,37 @@ function App() {
             setFormOpen(true)
           }}
         />
-        {activeSection === 'Dashboard' && (
+        {activeSection === 'Command Center' && (
           <Dashboard
             metrics={metrics}
             records={records}
             tasks={tasks}
             onSelectRecord={setSelectedId}
             onSectionChange={setActiveSection}
+            onToggleTask={toggleTask}
           />
         )}
-        {activeSection === 'Fashion-Liste' && (
+        {activeSection === 'Sourcing' && (
+          <SourcingView
+            onAiImport={(newRecords) => {
+              setRecords((current) => [...current, ...newRecords])
+              if (newRecords[0]) setSelectedId(newRecords[0].id)
+              setQuery('')
+              setCategoryFilter('Alle')
+              setStatusFilter('Alle')
+              setActiveSection('Partners')
+            }}
+            onBulkImport={(newRecords) => {
+              setRecords((current) => [...current, ...newRecords])
+              if (newRecords[0]) setSelectedId(newRecords[0].id)
+              setQuery('')
+              setCategoryFilter('Alle')
+              setStatusFilter('Alle')
+              setActiveSection('Partners')
+            }}
+          />
+        )}
+        {activeSection === 'Partners' && (
           <ListView
             records={filteredRecords}
             selectedRecord={selectedRecord}
@@ -148,43 +155,15 @@ function App() {
             onPatch={updateSelectedRecord}
           />
         )}
-        {activeSection === 'Pipeline' && (
-          <PipelineView records={filteredRecords} onSelect={setSelectedId} onPatch={saveRecord} />
+        {activeSection === 'Production' && (
+          <ProductionView module={activeModule} records={filteredRecords} onSelect={setSelectedId} onPatch={saveRecord} />
         )}
-        {activeSection === 'Kontakte' && <ContactsView records={filteredRecords} onSelect={setSelectedId} />}
-        {activeSection === 'Follow-ups' && (
-          <FollowUpsView records={records} onSelect={setSelectedId} onPatch={saveRecord} today={today} />
-        )}
-        {activeSection === 'Aufgaben' && (
-          <TasksView tasks={tasks} records={records} onToggle={toggleTask} onSelectRecord={setSelectedId} />
-        )}
-        {activeSection === 'Kategorien' && <CategoriesView records={records} />}
-        {activeSection === 'Potenzial' && <PotentialView records={records} />}
-        {activeSection === 'KI-Recherche' && (
-          <AiResearchView
-            onImport={(newRecords) => {
-              setRecords((current) => [...current, ...newRecords])
-              if (newRecords[0]) setSelectedId(newRecords[0].id)
-              setQuery('')
-              setCategoryFilter('Alle')
-              setStatusFilter('Alle')
-              setActiveSection('Fashion-Liste')
-            }}
-          />
-        )}
-        {activeSection === 'Vorlagen' && <TemplatesView templates={templates} onChange={setTemplates} />}
-        {activeSection === 'Bulk-Import' && (
-          <BulkImportView
-            onImport={(newRecords) => {
-              setRecords((current) => [...current, ...newRecords])
-              if (newRecords[0]) setSelectedId(newRecords[0].id)
-              setQuery('')
-              setCategoryFilter('Alle')
-              setStatusFilter('Alle')
-              setActiveSection('Fashion-Liste')
-            }}
-          />
-        )}
+        {activeSection === 'Creative Lab' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Mockups' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Legal Orientation' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Releases' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Web Ops' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Settings' && <WorkspaceFoundation module={activeModule} />}
       </main>
       {formOpen && (
         <RecordForm
@@ -227,33 +206,35 @@ function Sidebar({
     <aside className="sidebar">
       <div className="brand-block">
         <img src={logo} alt="Agorase Logo" />
-        <div>
-          <strong>AGORASE</strong>
-          <span>Fashion CRM</span>
-        </div>
+      <div>
+        <strong>AGORASE</strong>
+        <span>Fashion OS</span>
       </div>
-      <nav className="side-nav" aria-label="CRM Bereiche">
-        {sections.map((section) => (
+    </div>
+      <nav className="side-nav" aria-label="Fashion OS Bereiche">
+        {fashionOsModules.map((module) => (
           <button
-            key={section}
-            className={activeSection === section ? 'active' : ''}
+            key={module.section}
+            className={activeSection === module.section ? 'active' : ''}
             type="button"
-            onClick={() => onSelect(section)}
+            onClick={() => onSelect(module.section)}
           >
-            {section}
+            <span>{module.shortLabel}</span>
+            <small>{module.status}</small>
           </button>
         ))}
       </nav>
       <div className="today-label">
         <span>Heute</span>
         <strong>{metrics}</strong>
-        <small>offene CRM-Schritte</small>
+        <small>offene OS-Schritte</small>
       </div>
     </aside>
   )
 }
 
 function Topbar({
+  activeModule,
   query,
   categoryFilter,
   statusFilter,
@@ -262,6 +243,7 @@ function Topbar({
   onStatusChange,
   onAdd,
 }: {
+  activeModule: FashionOsModule
   query: string
   categoryFilter: 'Alle' | Category
   statusFilter: 'Alle' | PipelineStatus
@@ -273,8 +255,9 @@ function Topbar({
   return (
     <header className="topbar">
       <div>
-        <span className="label">Fashion Sourcing</span>
-        <h1>Labels, Ateliers und Produktionspartner kuratieren.</h1>
+        <span className="label">Fashion OS / {activeModule.status}</span>
+        <h1>{activeModule.label}</h1>
+        <p className="topbar-summary">{activeModule.summary}</p>
       </div>
       <div className="topbar-actions">
         <input
@@ -308,12 +291,14 @@ function Dashboard({
   tasks,
   onSelectRecord,
   onSectionChange,
+  onToggleTask,
 }: {
   metrics: ReturnType<typeof calculateMetrics>
   records: Manufactory[]
   tasks: CrmTask[]
   onSelectRecord: (id: string) => void
   onSectionChange: (section: Section) => void
+  onToggleTask: (task: CrmTask) => void
 }) {
   const topRecords = records.filter((record) => record.priority === 'A' || record.brandFit === 'A').slice(0, 4)
 
@@ -326,12 +311,12 @@ function Dashboard({
         <Metric label="Heute dran" value={metrics.dueFollowUps} dark />
       </div>
       <div className="panel wide">
-        <PanelHeader title="Priorisierte Fashion-Partner" action="Zur Liste" onClick={() => onSectionChange('Fashion-Liste')} />
+        <PanelHeader title="Priorisierte Fashion-Partner" action="Zu Partners" onClick={() => onSectionChange('Partners')} />
         <CompactTable records={topRecords} onSelect={onSelectRecord} />
       </div>
       <div className="panel">
-        <PanelHeader title="Nächste Schritte" action="Aufgaben" onClick={() => onSectionChange('Aufgaben')} />
-        <TaskList tasks={tasks.slice(0, 5)} records={records} onSelectRecord={onSelectRecord} />
+        <PanelHeader title="Nächste Schritte" action="Produktion" onClick={() => onSectionChange('Production')} />
+        <TaskList tasks={tasks.slice(0, 5)} records={records} onToggle={onToggleTask} onSelectRecord={onSelectRecord} />
       </div>
     </section>
   )
@@ -510,74 +495,33 @@ function PipelineView({
   )
 }
 
-function ContactsView({ records, onSelect }: { records: Manufactory[]; onSelect: (id: string) => void }) {
-  return (
-    <section className="panel">
-      <PanelHeader title="Kontakte" />
-      <div className="contact-grid">
-        {records.map((record) => (
-          <article className="contact-card" key={record.id} onClick={() => onSelect(record.id)}>
-            <strong>{record.name}</strong>
-            <span>{record.contactPerson || 'Ansprechpartner offen'}</span>
-            <a href={record.website} target="_blank">
-              Website
-            </a>
-            <a href={`mailto:${record.email}`}>{record.email || 'E-Mail fehlt'}</a>
-            <span>{record.phone || 'Telefon fehlt'}</span>
-            <span>{record.social || 'Social fehlt'}</span>
-          </article>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function FollowUpsView({
+function ProductionView({
+  module,
   records,
   onSelect,
   onPatch,
-  today,
 }: {
+  module: FashionOsModule
   records: Manufactory[]
   onSelect: (id: string) => void
   onPatch: (record: Manufactory) => void
-  today: string
 }) {
-  const sorted = [...records].filter((record) => record.nextFollowUp).sort((a, b) => a.nextFollowUp.localeCompare(b.nextFollowUp))
-
   return (
-    <section className="panel">
-      <PanelHeader title="Follow-ups" />
-      <div className="follow-list">
-        {sorted.map((record) => (
-          <article className={record.nextFollowUp <= today ? 'follow-row due' : 'follow-row'} key={record.id}>
-            <button type="button" onClick={() => onSelect(record.id)}>
-              {record.name}
-            </button>
-            <span>{record.nextStep}</span>
-            <input type="date" value={record.nextFollowUp} onChange={(event) => onPatch({ ...record, nextFollowUp: event.target.value })} />
-          </article>
-        ))}
-      </div>
+    <section className="production-layout">
+      <PipelineView records={records} onSelect={onSelect} onPatch={onPatch} />
+      <WorkspaceFoundation module={module} />
     </section>
   )
 }
 
-function TasksView({
-  tasks,
-  records,
-  onToggle,
-  onSelectRecord,
-}: {
-  tasks: CrmTask[]
-  records: Manufactory[]
-  onToggle: (task: CrmTask) => void
-  onSelectRecord: (id: string) => void
-}) {
+function WorkspaceFoundation({ module }: { module: FashionOsModule }) {
   return (
     <section className="panel">
-      <PanelHeader title="Aufgaben" />
-      <TaskList tasks={tasks} records={records} onToggle={onToggle} onSelectRecord={onSelectRecord} />
+      <PanelHeader title={module.label} />
+      <div className="foundation-panel">
+        <span className="label">{module.status}</span>
+        <p>{module.summary}</p>
+      </div>
     </section>
   )
 }
@@ -612,54 +556,22 @@ function TaskList({
   )
 }
 
-function CategoriesView({ records }: { records: Manufactory[] }) {
+function SourcingView({
+  onAiImport,
+  onBulkImport,
+}: {
+  onAiImport: (records: Manufactory[]) => void
+  onBulkImport: (records: Manufactory[]) => void
+}) {
   return (
-    <section className="panel">
-      <PanelHeader title="Kategorien" />
-      <div className="category-grid">
-        {categories.map((category) => {
-          const categoryRecords = records.filter((record) => record.category === category)
-          const highPotential = categoryRecords.filter((record) => record.cooperationPotential === 'Hoch').length
-          return (
-            <article className="category-card" key={category}>
-              <strong>{category}</strong>
-              <span>{categoryRecords.length} Kontakte</span>
-              <small>{highPotential} mit hohem Potenzial</small>
-            </article>
-          )
-        })}
-      </div>
-    </section>
-  )
-}
-
-function PotentialView({ records }: { records: Manufactory[] }) {
-  const buckets = ['Hoch', 'Mittel', 'Niedrig'] as const
-  return (
-    <section className="panel">
-      <PanelHeader title="Umsatz- und Potenzialbereich" />
-      <div className="bar-list">
-        {buckets.map((bucket) => {
-          const count = records.filter((record) => record.cooperationPotential === bucket).length
-          const width = records.length ? `${Math.round((count / records.length) * 100)}%` : '0%'
-          return (
-            <div className="bar-row" key={bucket}>
-              <span>{bucket}</span>
-              <div>
-                <i style={{ width }} />
-              </div>
-              <strong>{count}</strong>
-            </div>
-          )
-        })}
-      </div>
-      <CompactTable records={records.filter((record) => record.cooperationPotential === 'Hoch')} onSelect={() => undefined} />
+    <section className="sourcing-layout">
+      <AiResearchView onImport={onAiImport} />
+      <BulkImportView onImport={onBulkImport} />
     </section>
   )
 }
 
 function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => void }) {
-  const [apiKey, setApiKey] = useLocalState(storageKeys.apiKey, '')
   const [criteria, setCriteria] = useState<AiResearchCriteria>({
     categories: ['Streetwear', 'Ready-to-Wear', 'Schmuck'],
     regions: 'DACH, Norditalien, Benelux',
@@ -673,17 +585,11 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
   const [error, setError] = useState('')
 
   async function runResearch() {
-    if (!apiKey.trim()) {
-      setError('Bitte zuerst einen OpenAI API Key eintragen.')
-      setStatus('error')
-      return
-    }
-
     setStatus('loading')
     setError('')
 
     try {
-      const nextSuggestions = await requestAiManufactories({ apiKey: apiKey.trim(), criteria })
+      const nextSuggestions = await requestAiManufactories({ criteria })
       setSuggestions(nextSuggestions)
       setSelectedNames(nextSuggestions.map((suggestion) => suggestion.name))
       setStatus('idle')
@@ -709,18 +615,8 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
       <div className="panel ai-control-panel">
         <PanelHeader title="KI-Recherche" />
         <p className="helper-copy">
-          Lass dir passende Labels, Ateliers, Hersteller und Fashion-Partner per KI-Websuche vorschlagen und übernimm die besten Treffer direkt in die CRM-Liste.
+          Lass dir passende Labels, Ateliers, Hersteller und Fashion-Partner per interner Recherche vorschlagen und übernimm die besten Treffer direkt in die Partnerliste.
         </p>
-        <label>
-          OpenAI API Key
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(event) => setApiKey(event.target.value)}
-            placeholder="sk-..."
-            autoComplete="off"
-          />
-        </label>
         <label>
           Regionen / Länder
           <input
@@ -828,28 +724,10 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
             disabled={!selectedSuggestions.length}
             onClick={() => onImport(selectedSuggestions.map(suggestionToManufacture))}
           >
-            {selectedSuggestions.length} Vorschläge ins CRM übernehmen
+            {selectedSuggestions.length} Vorschläge übernehmen
           </button>
         )}
       </div>
-    </section>
-  )
-}
-
-function TemplatesView({ templates, onChange }: { templates: Template[]; onChange: (templates: Template[]) => void }) {
-  function updateTemplate(id: string, patch: Partial<Template>) {
-    onChange(templates.map((template) => (template.id === id ? { ...template, ...patch } : template)))
-  }
-
-  return (
-    <section className="template-grid">
-      {templates.map((template) => (
-        <article className="panel template-card" key={template.id}>
-          <input value={template.name} onChange={(event) => updateTemplate(template.id, { name: event.target.value })} />
-          <input value={template.subject} onChange={(event) => updateTemplate(template.id, { subject: event.target.value })} />
-          <textarea value={template.body} onChange={(event) => updateTemplate(template.id, { body: event.target.value })} />
-        </article>
-      ))}
     </section>
   )
 }

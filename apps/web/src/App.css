@@ -81,15 +81,29 @@ button {
 }
 
 .side-nav button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
   text-align: left;
   padding: 10px 11px;
   border-radius: 4px;
   color: var(--soft-text);
 }
 
+.side-nav button small {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
 .side-nav button.active {
   background: var(--ink);
   color: var(--canvas);
+}
+
+.side-nav button.active small {
+  color: #d8d0c4;
 }
 
 .today-label {
@@ -145,6 +159,14 @@ h1 {
   margin-top: 7px;
   font-size: 31px;
   line-height: 1.05;
+}
+
+.topbar-summary {
+  max-width: 680px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 h2 {
@@ -405,6 +427,12 @@ label {
   padding-bottom: 8px;
 }
 
+.production-layout,
+.sourcing-layout {
+  display: grid;
+  gap: 16px;
+}
+
 .pipeline-column {
   background: #eee9df;
   border: 1px solid var(--line);
@@ -539,6 +567,23 @@ label {
   grid-template-columns: 380px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+}
+
+.foundation-panel {
+  min-height: 150px;
+  border: 1px dashed var(--line);
+  border-radius: 5px;
+  background: #faf7f0;
+  padding: 16px;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+}
+
+.foundation-panel p {
+  max-width: 620px;
+  color: var(--soft-text);
+  line-height: 1.5;
 }
 
 .ai-control-panel {
