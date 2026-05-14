@@ -19,7 +19,7 @@ describe('buildAiResearchPrompt', () => {
 })
 
 describe('parseAiResearchResponse', () => {
-  it('extracts structured suggestions from Responses API output_text', () => {
+  it('extracts structured suggestions from legacy output_text payloads', () => {
     const parsed = parseAiResearchResponse({
       output_text: JSON.stringify({
         suggestions: [
@@ -55,6 +55,42 @@ describe('parseAiResearchResponse', () => {
       category: 'Ready-to-Wear',
       confidence: 86,
       sources: [{ title: 'Atelier Forma', url: 'https://forma.example' }],
+    })
+  })
+
+  it('accepts the internal research API suggestion envelope', () => {
+    const parsed = parseAiResearchResponse({
+      suggestions: [
+        {
+          name: 'Studio Nadel',
+          contactPerson: '',
+          category: 'Tailoring',
+          city: 'Berlin',
+          region: 'Berlin',
+          country: 'Deutschland',
+          website: 'https://studio-nadel.example',
+          email: '',
+          phone: '',
+          social: '',
+          products: 'Small-batch tailoring',
+          priceLevel: 'Luxus',
+          brandFit: 'A-',
+          cooperationPotential: 'Hoch',
+          priority: 'A',
+          source: '',
+          nextStep: '',
+          notes: '',
+          confidence: 78,
+          rationale: 'Strong production fit',
+          sources: [],
+        },
+      ],
+    })
+
+    expect(parsed[0]).toMatchObject({
+      name: 'Studio Nadel',
+      source: 'KI-Recherche',
+      nextStep: 'Line Sheet oder Wholesale-Kontakt prüfen',
     })
   })
 })

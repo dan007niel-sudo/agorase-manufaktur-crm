@@ -129,46 +129,39 @@ export function buildAiResearchPrompt(criteria: AiResearchCriteria) {
 }
 
 export async function requestAiManufactories({
-  apiKey,
   criteria,
-  model = 'gpt-5.4-mini',
 }: {
-  apiKey: string
   criteria: AiResearchCriteria
-  model?: string
 }) {
-  const response = await fetch('/api/openai/v1/responses', {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  const response = await fetch(`${apiBaseUrl}/api/research/partners`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model,
-      tools: [{ type: 'web_search' }],
-      tool_choice: 'auto',
-      include: ['web_search_call.action.sources'],
-      input: buildAiResearchPrompt(criteria),
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'agorase_manufactory_suggestions',
-          strict: true,
-          schema: aiSuggestionSchema,
-        },
-      },
+      categories: criteria.categories,
+      regions: criteria.regions,
+      productFocus: criteria.productFocus,
+      priceLevel: criteria.priceLevel,
+      count: criteria.count,
     }),
   })
 
   if (!response.ok) {
     const errorText = await response.text()
-    throw new Error(errorText || `OpenAI request failed with status ${response.status}`)
+    throw new Error(errorText || `Research request failed with status ${response.status}`)
   }
 
   return parseAiResearchResponse(await response.json())
 }
 
 export function parseAiResearchResponse(payload: unknown): AiResearchSuggestion[] {
+  if (payload && typeof payload === 'object' && 'suggestions' in payload) {
+    const suggestions = payload.suggestions
+    return Array.isArray(suggestions) ? suggestions.map(normalizeSuggestion) : []
+  }
+
   const text = extractOutputText(payload)
   if (!text) return []
 
@@ -238,6 +231,7 @@ function normalizeSuggestion(suggestion: AiResearchSuggestion): AiResearchSugges
   return {
     ...suggestion,
     source: suggestion.source || 'KI-Recherche',
+    nextStep: suggestion.nextStep || 'Line Sheet oder Wholesale-Kontakt prüfen',
     confidence: Math.max(0, Math.min(100, Number(suggestion.confidence) || 0)),
     sources: Array.isArray(suggestion.sources) ? suggestion.sources : [],
   }
