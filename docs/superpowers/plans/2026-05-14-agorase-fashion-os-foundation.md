@@ -164,19 +164,19 @@ Set root `package.json` to:
   "version": "0.1.0",
   "type": "module",
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "dev": "npm run dev -w @agorase/web",
     "dev:web": "npm run dev -w @agorase/web",
     "dev:api": "npm run dev -w @agorase/api",
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run build -w @agorase/shared && npm run build -w @agorase/web",
     "build:web": "npm run build -w @agorase/web",
     "build:api": "npm run build -w @agorase/api",
     "lint": "eslint .",
     "test": "vitest run",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run typecheck -w @agorase/shared && npm run typecheck -w @agorase/web",
     "preview": "npm run preview -w @agorase/web"
   },
   "devDependencies": {
@@ -672,6 +672,19 @@ Create `apps/api/tsconfig.json`:
 }
 ```
 
+- [ ] **Step 1b: Add API to root verification scripts**
+
+After `apps/api/package.json` exists, update the root `package.json` scripts:
+
+```json
+{
+  "scripts": {
+    "build": "npm run build -w @agorase/shared && npm run build -w @agorase/api && npm run build -w @agorase/web",
+    "typecheck": "npm run typecheck -w @agorase/shared && npm run typecheck -w @agorase/api && npm run typecheck -w @agorase/web"
+  }
+}
+```
+
 - [ ] **Step 2: Create API env loader**
 
 Create `apps/api/src/env.ts`:
@@ -682,7 +695,7 @@ export interface ApiEnv {
   geminiApiKey: string
   geminiTextModel: string
   geminiImageModel: string
-  allowedOrigin: string
+  allowedOrigins: string[]
 }
 
 export function readEnv(source = process.env): ApiEnv {
@@ -691,7 +704,10 @@ export function readEnv(source = process.env): ApiEnv {
     geminiApiKey: source.GEMINI_API_KEY || source.GOOGLE_API_KEY || '',
     geminiTextModel: source.GEMINI_TEXT_MODEL || 'gemini-2.5-pro',
     geminiImageModel: source.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview',
-    allowedOrigin: source.ALLOWED_ORIGIN || '*'
+    allowedOrigins: (source.ALLOWED_ORIGINS || 'http://localhost:5173')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
   }
 }
 ```
@@ -703,7 +719,13 @@ Create `apps/api/src/http.ts`:
 ```ts
 import type { ApiErrorBody } from '@agorase/shared'
 
-export function jsonResponse(body: unknown, status = 200, origin = '*') {
+export function resolveOrigin(request: Request, allowedOrigins: string[]) {
+  const origin = request.headers.get('origin')
+  if (!origin) return allowedOrigins[0] || 'http://localhost:5173'
+  return allowedOrigins.includes(origin) ? origin : allowedOrigins[0] || 'http://localhost:5173'
+}
+
+export function jsonResponse(body: unknown, status = 200, origin = 'http://localhost:5173') {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -715,12 +737,14 @@ export function jsonResponse(body: unknown, status = 200, origin = '*') {
   })
 }
 
-export function errorResponse(code: string, message: string, status = 400, origin = '*') {
+export function errorResponse(code: string, message: string, status = 400, origin = 'http://localhost:5173') {
   const body: ApiErrorBody = { error: { code, message } }
   return jsonResponse(body, status, origin)
 }
 
 export async function readJson<T>(request: Request): Promise<T> {
+  const contentLength = Number(request.headers.get('content-length') || 0)
+  if (contentLength > 100_000) throw new Error('Request body is too large')
   return (await request.json()) as T
 }
 ```
@@ -759,10 +783,13 @@ export async function researchPartnersWithGemini(
   }
 
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiTextModel}:generateContent?key=${env.geminiApiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${env.geminiTextModel}:generateContent`,
     {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': env.geminiApiKey
+      },
       body: JSON.stringify({
         contents: [
           {
@@ -778,7 +805,7 @@ export async function researchPartnersWithGemini(
   )
 
   if (!response.ok) {
-    throw new Error(`Gemini request failed with status ${response.status}`)
+    throw new Error('Gemini provider request failed')
   }
 
   const payload = (await response.json()) as {
@@ -796,10 +823,10 @@ Create `apps/api/src/routes/health.ts`:
 ```ts
 import type { HealthResponse } from '@agorase/shared'
 import type { ApiEnv } from '../env'
-import { jsonResponse } from '../http'
+import { jsonResponse, resolveOrigin } from '../http'
 import { hasGeminiConfig } from '../providers/gemini'
 
-export function healthRoute(env: ApiEnv) {
+export function healthRoute(request: Request, env: ApiEnv) {
   const body: HealthResponse = {
     ok: true,
     providers: {
@@ -808,7 +835,7 @@ export function healthRoute(env: ApiEnv) {
     }
   }
 
-  return jsonResponse(body, 200, env.allowedOrigin)
+  return jsonResponse(body, 200, resolveOrigin(request, env.allowedOrigins))
 }
 ```
 
@@ -818,27 +845,31 @@ Create `apps/api/src/routes/research.ts`:
 
 ```ts
 import type { PartnerResearchRequest } from '@agorase/shared'
-import { clampCount } from '@agorase/shared'
+import { clampCount, partnerCategories } from '@agorase/shared'
 import type { ApiEnv } from '../env'
-import { errorResponse, jsonResponse, readJson } from '../http'
+import { errorResponse, jsonResponse, readJson, resolveOrigin } from '../http'
 import { researchPartnersWithGemini } from '../providers/gemini'
 
 export async function researchRoute(request: Request, env: ApiEnv) {
+  const origin = resolveOrigin(request, env.allowedOrigins)
   try {
     const body = await readJson<PartnerResearchRequest>(request)
     const normalized: PartnerResearchRequest = {
-      categories: Array.isArray(body.categories) ? body.categories : [],
+      categories: Array.isArray(body.categories)
+        ? body.categories.filter((category) => partnerCategories.includes(category))
+        : [],
       regions: body.regions || '',
       productFocus: body.productFocus || '',
       priceLevel: body.priceLevel || 'Alle',
       count: clampCount(body.count)
     }
     const result = await researchPartnersWithGemini(env, normalized)
-    return jsonResponse(result, 200, env.allowedOrigin)
+    return jsonResponse(result, 200, origin)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Partner research failed'
     const status = message.includes('not configured') ? 503 : 400
-    return errorResponse('research_failed', message, status, env.allowedOrigin)
+    const safeMessage = status === 503 ? message : 'Partner research failed'
+    return errorResponse('research_failed', safeMessage, status, origin)
   }
 }
 ```
@@ -849,16 +880,16 @@ Create `apps/api/src/routes/visualize.ts`:
 
 ```ts
 import type { ApiEnv } from '../env'
-import { jsonResponse } from '../http'
+import { jsonResponse, resolveOrigin } from '../http'
 
-export async function visualizeRoute(_request: Request, env: ApiEnv) {
+export async function visualizeRoute(request: Request, env: ApiEnv) {
   return jsonResponse(
     {
       directions: [],
       message: 'Creative visualization is wired through the secure API boundary and awaits provider implementation.'
     },
     200,
-    env.allowedOrigin
+    resolveOrigin(request, env.allowedOrigins)
   )
 }
 ```
@@ -868,7 +899,7 @@ Create `apps/api/src/routes/mockups.ts`:
 ```ts
 import type { ImageGenerationResponse } from '@agorase/shared'
 import type { ApiEnv } from '../env'
-import { jsonResponse } from '../http'
+import { jsonResponse, resolveOrigin } from '../http'
 
 export async function mockupsRoute(_request: Request, env: ApiEnv) {
   const body: ImageGenerationResponse = {
@@ -876,7 +907,7 @@ export async function mockupsRoute(_request: Request, env: ApiEnv) {
     message: `Image generation is configured for server-side provider routing via ${env.geminiImageModel}.`
   }
 
-  return jsonResponse(body, 202, env.allowedOrigin)
+  return jsonResponse(body, 202, resolveOrigin(_request, env.allowedOrigins))
 }
 ```
 
@@ -886,7 +917,7 @@ Create `apps/api/src/index.ts`:
 
 ```ts
 import { readEnv } from './env'
-import { errorResponse, jsonResponse } from './http'
+import { errorResponse, jsonResponse, resolveOrigin } from './http'
 import { healthRoute } from './routes/health'
 import { mockupsRoute } from './routes/mockups'
 import { researchRoute } from './routes/research'
@@ -895,13 +926,13 @@ import { visualizeRoute } from './routes/visualize'
 export async function handleRequest(request: Request, env = readEnv()) {
   const url = new URL(request.url)
 
-  if (request.method === 'OPTIONS') return jsonResponse({}, 204, env.allowedOrigin)
-  if (url.pathname === '/api/health' && request.method === 'GET') return healthRoute(env)
+  if (request.method === 'OPTIONS') return jsonResponse({}, 204, resolveOrigin(request, env.allowedOrigins))
+  if (url.pathname === '/api/health' && request.method === 'GET') return healthRoute(request, env)
   if (url.pathname === '/api/research/partners' && request.method === 'POST') return researchRoute(request, env)
   if (url.pathname === '/api/visualize' && request.method === 'POST') return visualizeRoute(request, env)
   if (url.pathname === '/api/mockups/generate' && request.method === 'POST') return mockupsRoute(request, env)
 
-  return errorResponse('not_found', 'Route not found', 404, env.allowedOrigin)
+  return errorResponse('not_found', 'Route not found', 404, resolveOrigin(request, env.allowedOrigins))
 }
 
 const env = readEnv()
@@ -1143,7 +1174,8 @@ export async function requestAiManufactories({
   criteria: AiResearchCriteria
   model?: string
 }) {
-  const response = await fetch('/api/research/partners', {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+  const response = await fetch(`${apiBaseUrl}/api/research/partners`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -1240,11 +1272,14 @@ GEMINI_API_KEY=
 GOOGLE_API_KEY=
 GEMINI_TEXT_MODEL=gemini-2.5-pro
 GEMINI_IMAGE_MODEL=gemini-3-pro-image-preview
-ALLOWED_ORIGIN=http://localhost:5173
+ALLOWED_ORIGINS=http://localhost:5173
 PORT=8787
 
 # Web development proxy target.
 VITE_API_PROXY_TARGET=http://localhost:8787
+
+# Web production API origin. This is not a secret.
+VITE_API_BASE_URL=http://localhost:8787
 ```
 
 - [ ] **Step 2: Add Render Blueprint**
@@ -1268,7 +1303,7 @@ services:
         value: gemini-2.5-pro
       - key: GEMINI_IMAGE_MODEL
         value: gemini-3-pro-image-preview
-      - key: ALLOWED_ORIGIN
+      - key: ALLOWED_ORIGINS
         sync: false
 
   - type: web
@@ -1283,7 +1318,7 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 24
-      - key: VITE_API_PROXY_TARGET
+      - key: VITE_API_BASE_URL
         sync: false
 ```
 
@@ -1314,7 +1349,7 @@ Copy `.env.example` to local environment files as needed. Do not commit real sec
 
 ## Render
 
-Deploy the frontend as a Render Static Site from `apps/web/dist`. Deploy the backend as a Render Web Service. Set Gemini secrets only on the API service. Configure the web app to call the deployed API URL.
+Deploy the frontend as a Render Static Site from `apps/web/dist`. Deploy the backend as a Render Web Service. Set Gemini secrets only on the API service. Configure the web app with `VITE_API_BASE_URL` pointing to the deployed API URL. `VITE_API_PROXY_TARGET` is for local Vite development only.
 ```
 
 - [ ] **Step 4: Verify deployment commands locally**
@@ -1396,6 +1431,8 @@ Expected:
 
 - No frontend localStorage API-key storage remains.
 - `GEMINI_API_KEY` appears only in `.env.example`, README docs, API env handling, or Render config.
+- Gemini provider calls do not put API keys in URLs or query strings.
+- API errors returned to the frontend do not include raw provider responses.
 - No real key values appear.
 
 - [ ] **Step 4: Final commit if merge produced changes**
