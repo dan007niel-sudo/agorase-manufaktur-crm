@@ -1,4 +1,4 @@
-import type { ProviderStatus } from './fashion'
+import type { ProviderStatus } from './fashion.js'
 
 export interface ApiErrorBody {
   error: {

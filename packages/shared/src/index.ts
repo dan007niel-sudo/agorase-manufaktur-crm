@@ -1,3 +1,3 @@
-export * from './api'
-export * from './ai'
-export * from './fashion'
+export * from './api.js'
+export * from './ai.js'
+export * from './fashion.js'
