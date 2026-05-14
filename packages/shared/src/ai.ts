@@ -1,4 +1,4 @@
-import type { PartnerCategory } from './fashion'
+import type { PartnerCategory } from './fashion.js'
 
 export interface SourceLink {
   title: string

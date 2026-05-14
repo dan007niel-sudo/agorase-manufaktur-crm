@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampCount, fashionOsSections, partnerCategories, partnerStatuses } from './index'
+import { clampCount, fashionOsSections, partnerCategories, partnerStatuses } from './index.js'
 
 describe('Fashion OS shared contracts', () => {
   it('defines the main operating system sections', () => {
