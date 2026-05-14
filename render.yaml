@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: agorase-fashion-os-api
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build:api
+    startCommand: npm run start -w @agorase/api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_TEXT_MODEL
+        value: gemini-2.5-pro
+      - key: GEMINI_IMAGE_MODEL
+        value: gemini-3-pro-image-preview
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: agorase-fashion-os-web
+    runtime: static
+    buildCommand: npm install && npm run build:web
+    staticPublishPath: apps/web/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: 24
+      - key: VITE_API_BASE_URL
+        sync: false

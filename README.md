@@ -1,73 +1,69 @@
-# React + TypeScript + Vite
+# Agorase Fashion OS
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Agorase Fashion OS is a clothing-brand operating system for European production sourcing, partner workflows, creative planning, mockups, legal orientation, releases, and web operations.
 
-Currently, two official plugins are available:
+The product is one repository with two deployment runtimes:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- `apps/web`: React/Vite frontend for the Fashion OS interface.
+- `apps/api`: secure Node API service for Gemini and future image-generation provider calls.
+- `packages/shared`: shared TypeScript contracts used by web and API.
 
-## React Compiler
+## Local Development
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Install dependencies:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Run the API service:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev:api
 ```
+
+Run the web app in another terminal:
+
+```bash
+npm run dev:web
+```
+
+The Vite dev server proxies `/api` to `VITE_API_PROXY_TARGET`, which defaults to `http://localhost:8787`.
+
+## Verification
+
+```bash
+npm test
+npm run typecheck
+npm run build
+npm run lint
+```
+
+## Environment
+
+Copy `.env.example` for local service configuration as needed. Do not commit real secrets.
+
+`GEMINI_API_KEY` or `GOOGLE_API_KEY` belongs on the API service only. Do not create `VITE_*` variables for provider secrets because Vite exposes those values to the browser bundle.
+
+## Render Deployment
+
+Deploy the frontend as a Render Static Site from `apps/web/dist`. Deploy the backend as a Render Web Service. Set Gemini secrets only on the API service.
+
+Recommended API settings:
+
+- Build command: `npm install && npm run build:api`
+- Start command: `npm run start -w @agorase/api`
+- Health check path: `/api/health`
+- Secret env: `GEMINI_API_KEY`
+- CORS env: `ALLOWED_ORIGINS=https://your-static-site.onrender.com`
+
+Recommended web settings:
+
+- Build command: `npm install && npm run build:web`
+- Publish directory: `apps/web/dist`
+- SPA rewrite: `/*` to `/index.html`
+- Public env: `VITE_API_BASE_URL=https://your-api-service.onrender.com`
+
+`VITE_API_PROXY_TARGET` is local-development-only. Production browser calls should use `VITE_API_BASE_URL`.
+
+See `docs/deployment/render-readiness.md` for the deployment checklist.
