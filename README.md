@@ -49,6 +49,11 @@ Copy `.env.example` for local service configuration as needed. Do not commit rea
 
 Deploy the frontend as a Render Static Site from `apps/web/dist`. Deploy the backend as a Render Web Service. Set Gemini secrets only on the API service.
 
+The repository includes a Render Blueprint at `render.yaml`.
+
+- GitHub repo: `https://github.com/dan007niel-sudo/agorase-manufaktur-crm`
+- Blueprint start link: `https://render.com/deploy?repo=https://github.com/dan007niel-sudo/agorase-manufaktur-crm`
+
 Recommended API settings:
 
 - Build command: `npm install && npm run build:api`
@@ -63,6 +68,12 @@ Recommended web settings:
 - Publish directory: `apps/web/dist`
 - SPA rewrite: `/*` to `/index.html`
 - Public env: `VITE_API_BASE_URL=https://your-api-service.onrender.com`
+
+Initial Blueprint values to enter in Render:
+
+- API service `GEMINI_API_KEY`: your Gemini API key
+- API service `ALLOWED_ORIGINS`: the deployed web Static Site origin
+- Web Static Site `VITE_API_BASE_URL`: the deployed API service origin
 
 `VITE_API_PROXY_TARGET` is local-development-only. Production browser calls should use `VITE_API_BASE_URL`.
 
