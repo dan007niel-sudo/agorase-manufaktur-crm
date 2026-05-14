@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { Manufactory } from '@agorase/shared'
 import { readEnv } from './env.js'
 import { handleRequest } from './index.js'
 import { buildPartnerResearchPrompt, hasGeminiConfig } from './providers/gemini.js'
@@ -8,6 +9,41 @@ afterEach(() => {
 })
 
 describe('API server', () => {
+  const testPartner: Manufactory = {
+    id: 'atelier-forma',
+    name: 'Atelier Forma',
+    contactPerson: '',
+    category: 'Ready-to-Wear',
+    city: 'Köln',
+    region: 'NRW',
+    country: 'Deutschland',
+    website: 'https://forma.example',
+    email: '',
+    phone: '',
+    social: '',
+    products: 'Overshirts',
+    priceLevel: 'Premium',
+    brandFit: 'A',
+    cooperationPotential: 'Hoch',
+    status: 'Recherchiert',
+    priority: 'A',
+    source: 'Test',
+    lastContact: '',
+    nextFollowUp: '',
+    nextStep: 'Line Sheet prüfen',
+    notes: '',
+  }
+
+  function fakePartnersRepository(partners: Manufactory[] = []) {
+    return {
+      list: vi.fn(async () => partners),
+      upsert: vi.fn(async (partner: Manufactory) => partner),
+      update: vi.fn(async (id: string, patch: Partial<Manufactory>) => ({ ...testPartner, ...patch, id })),
+      delete: vi.fn(async () => undefined),
+      importMany: vi.fn(async (nextPartners: Manufactory[]) => nextPartners),
+    }
+  }
+
   it('reports missing Gemini config without exposing secrets', async () => {
     const response = await handleRequest(new Request('http://localhost/api/health'), readEnv({}))
     const body = await response.json()
@@ -154,5 +190,93 @@ describe('API server', () => {
       error: { code: 'provider_unavailable', message: 'Partner research provider is temporarily unavailable.' },
     })
     expect(JSON.stringify(body)).not.toContain('raw provider secret failure')
+  })
+
+  it('lists partners from the repository', async () => {
+    const partnersRepository = fakePartnersRepository([testPartner])
+    const response = await handleRequest(new Request('http://localhost/api/partners'), {
+      env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+      partnersRepository,
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ partners: [testPartner] })
+    expect(partnersRepository.list).toHaveBeenCalled()
+  })
+
+  it('saves one partner through the repository', async () => {
+    const partnersRepository = fakePartnersRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/partners', {
+        method: 'POST',
+        body: JSON.stringify(testPartner),
+      }),
+      {
+        env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+        partnersRepository,
+      },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ partner: testPartner })
+    expect(partnersRepository.upsert).toHaveBeenCalledWith(testPartner)
+  })
+
+  it('updates one partner through the repository', async () => {
+    const partnersRepository = fakePartnersRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/partners/atelier-forma', {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'Antwort erhalten' }),
+      }),
+      {
+        env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+        partnersRepository,
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(partnersRepository.update).toHaveBeenCalledWith('atelier-forma', { status: 'Antwort erhalten' })
+  })
+
+  it('deletes one partner through the repository', async () => {
+    const partnersRepository = fakePartnersRepository()
+    const response = await handleRequest(new Request('http://localhost/api/partners/atelier-forma', { method: 'DELETE' }), {
+      env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+      partnersRepository,
+    })
+
+    expect(response.status).toBe(204)
+    expect(partnersRepository.delete).toHaveBeenCalledWith('atelier-forma')
+  })
+
+  it('imports partners through the repository', async () => {
+    const partnersRepository = fakePartnersRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/partners/import', {
+        method: 'POST',
+        body: JSON.stringify({ partners: [testPartner] }),
+      }),
+      {
+        env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+        partnersRepository,
+      },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ partners: [testPartner] })
+    expect(partnersRepository.importMany).toHaveBeenCalledWith([testPartner])
+  })
+
+  it('returns a normalized database error when partners are requested without a repository', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/partners'),
+      readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+    )
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'database_unavailable', message: 'Database is not configured.' },
+    })
   })
 })

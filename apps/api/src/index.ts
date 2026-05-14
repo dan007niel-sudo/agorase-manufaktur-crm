@@ -1,11 +1,19 @@
-import { readEnv } from './env.js'
+import { readEnv, type ApiEnv } from './env.js'
 import { errorResponse, jsonResponse, resolveOrigin } from './http.js'
 import { healthRoute } from './routes/health.js'
 import { mockupsRoute } from './routes/mockups.js'
+import { partnersRoute, type PartnersRepository } from './routes/partners.js'
 import { researchRoute } from './routes/research.js'
 import { visualizeRoute } from './routes/visualize.js'
 
-export async function handleRequest(request: Request, env = readEnv()) {
+export interface ApiContext {
+  env: ApiEnv
+  partnersRepository?: PartnersRepository
+}
+
+export async function handleRequest(request: Request, contextOrEnv: ApiEnv | ApiContext = readEnv()) {
+  const context = toContext(contextOrEnv)
+  const env = context.env
   const url = new URL(request.url)
   const origin = resolveOrigin(request, env.allowedOrigins)
   const pathname = url.pathname.replace(/\/$/, '')
@@ -15,8 +23,18 @@ export async function handleRequest(request: Request, env = readEnv()) {
   if (pathname === '/api/research/partners' && request.method === 'POST') return researchRoute(request, env)
   if (pathname === '/api/visualize' && request.method === 'POST') return visualizeRoute(request, env)
   if (pathname === '/api/mockups/generate' && request.method === 'POST') return mockupsRoute(request, env)
+  if (pathname === '/api/partners' || pathname.startsWith('/api/partners/')) {
+    if (!context.partnersRepository) {
+      return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    }
+    return partnersRoute(request, env, context.partnersRepository)
+  }
 
   return errorResponse('not_found', 'Route not found', 404, origin)
+}
+
+function toContext(contextOrEnv: ApiEnv | ApiContext): ApiContext {
+  return 'env' in contextOrEnv ? contextOrEnv : { env: contextOrEnv }
 }
 
 const env = readEnv()
