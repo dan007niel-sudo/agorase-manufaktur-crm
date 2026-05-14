@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import logo from './assets/agorase-logo.jpeg'
 import './App.css'
 import { seedManufactories } from './data'
@@ -25,6 +25,7 @@ import {
   type AiResearchSuggestion,
 } from './aiResearch'
 import { fashionOsModules, type FashionOsModule } from './fashionOs'
+import { importPartners, listPartners, savePartner, updatePartner } from './partnersApi'
 
 type Section = FashionOsModule['section']
 
@@ -41,7 +42,9 @@ function App() {
   }
 
   const [activeSection, setActiveSection] = useState<Section>('Command Center')
-  const [records, setRecords] = useLocalState<Manufactory[]>(storageKeys.records, seedManufactories)
+  const [records, setRecords] = useState<Manufactory[]>(seedManufactories)
+  const [recordsStatus, setRecordsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [recordsError, setRecordsError] = useState('')
   const [completedTasks, setCompletedTasks] = useLocalState<string[]>(storageKeys.completedTasks, [])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
@@ -82,15 +85,88 @@ function App() {
   }))
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
 
-  function saveRecord(nextRecord: Manufactory) {
-    setRecords((current) => upsertManufacture(current, nextRecord))
-    setSelectedId(nextRecord.id)
-    setFormOpen(false)
+  useEffect(() => {
+    let active = true
+
+    async function loadRecords() {
+      try {
+        const loaded = await listPartners()
+        if (!active) return
+        const nextRecords = loaded.length ? loaded : seedManufactories
+        setRecords(nextRecords)
+        setSelectedId((current) => current || nextRecords[0]?.id || '')
+        setRecordsStatus('ready')
+        setRecordsError('')
+      } catch (caught) {
+        if (!active) return
+        setRecords(seedManufactories)
+        setRecordsError(caught instanceof Error ? caught.message : 'Partner konnten nicht geladen werden.')
+        setRecordsStatus('error')
+      }
+    }
+
+    void loadRecords()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  async function saveRecord(nextRecord: Manufactory) {
+    try {
+      const saved = await savePartner(nextRecord)
+      setRecords((current) => upsertManufacture(current, saved))
+      setSelectedId(saved.id)
+      setFormOpen(false)
+      setRecordsStatus('ready')
+      setRecordsError('')
+    } catch (caught) {
+      setRecordsStatus('error')
+      setRecordsError(caught instanceof Error ? caught.message : 'Partner konnte nicht gespeichert werden.')
+    }
   }
 
-  function updateSelectedRecord(patch: Partial<Manufactory>) {
+  async function updateSelectedRecord(patch: Partial<Manufactory>) {
     if (!selectedRecord) return
-    saveRecord({ ...selectedRecord, ...patch })
+    try {
+      const updated = await updatePartner(selectedRecord.id, patch)
+      setRecords((current) => upsertManufacture(current, updated))
+      setSelectedId(updated.id)
+      setRecordsStatus('ready')
+      setRecordsError('')
+    } catch (caught) {
+      setRecordsStatus('error')
+      setRecordsError(caught instanceof Error ? caught.message : 'Partner konnte nicht aktualisiert werden.')
+    }
+  }
+
+  async function saveImportedRecords(newRecords: Manufactory[]) {
+    try {
+      const saved = await importPartners(newRecords)
+      setRecords((current) => saved.reduce((next, record) => upsertManufacture(next, record), current))
+      if (saved[0]) setSelectedId(saved[0].id)
+      setQuery('')
+      setCategoryFilter('Alle')
+      setStatusFilter('Alle')
+      setRecordsStatus('ready')
+      setRecordsError('')
+      setActiveSection('Partners')
+    } catch (caught) {
+      setRecordsStatus('error')
+      setRecordsError(caught instanceof Error ? caught.message : 'Partner konnten nicht importiert werden.')
+    }
+  }
+
+  async function saveSeedRecords() {
+    try {
+      const saved = await importPartners(seedManufactories)
+      setRecords(saved)
+      setSelectedId(saved[0]?.id ?? '')
+      setRecordsStatus('ready')
+      setRecordsError('')
+    } catch (caught) {
+      setRecordsStatus('error')
+      setRecordsError(caught instanceof Error ? caught.message : 'Seed-Daten konnten nicht gespeichert werden.')
+    }
   }
 
   function toggleTask(task: CrmTask) {
@@ -116,6 +192,7 @@ function App() {
             setFormOpen(true)
           }}
         />
+        {recordsStatus === 'error' && <div className="app-alert">Partnerdaten konnten nicht synchronisiert werden.</div>}
         {activeSection === 'Command Center' && (
           <Dashboard
             metrics={metrics}
@@ -128,22 +205,8 @@ function App() {
         )}
         {activeSection === 'Sourcing' && (
           <SourcingView
-            onAiImport={(newRecords) => {
-              setRecords((current) => [...current, ...newRecords])
-              if (newRecords[0]) setSelectedId(newRecords[0].id)
-              setQuery('')
-              setCategoryFilter('Alle')
-              setStatusFilter('Alle')
-              setActiveSection('Partners')
-            }}
-            onBulkImport={(newRecords) => {
-              setRecords((current) => [...current, ...newRecords])
-              if (newRecords[0]) setSelectedId(newRecords[0].id)
-              setQuery('')
-              setCategoryFilter('Alle')
-              setStatusFilter('Alle')
-              setActiveSection('Partners')
-            }}
+            onAiImport={saveImportedRecords}
+            onBulkImport={saveImportedRecords}
           />
         )}
         {activeSection === 'Partners' && (
@@ -163,7 +226,18 @@ function App() {
         {activeSection === 'Legal Orientation' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Releases' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Web Ops' && <WorkspaceFoundation module={activeModule} />}
-        {activeSection === 'Settings' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Settings' && (
+          <SettingsView
+            status={
+              recordsStatus === 'error'
+                ? recordsError
+                : recordsStatus === 'loading'
+                  ? 'Partnerdaten werden geladen.'
+                  : 'Partnerdaten werden über die API synchronisiert.'
+            }
+            onSeedSave={saveSeedRecords}
+          />
+        )}
       </main>
       {formOpen && (
         <RecordForm
@@ -526,6 +600,21 @@ function WorkspaceFoundation({ module }: { module: FashionOsModule }) {
   )
 }
 
+function SettingsView({ onSeedSave, status }: { onSeedSave: () => void | Promise<void>; status: string }) {
+  return (
+    <section className="panel">
+      <PanelHeader title="Settings" />
+      <div className="foundation-panel">
+        <span className="label">Phase 2A</span>
+        <p>{status}</p>
+        <button type="button" className="primary-button" onClick={onSeedSave}>
+          Seed speichern
+        </button>
+      </div>
+    </section>
+  )
+}
+
 function TaskList({
   tasks,
   records,
@@ -560,8 +649,8 @@ function SourcingView({
   onAiImport,
   onBulkImport,
 }: {
-  onAiImport: (records: Manufactory[]) => void
-  onBulkImport: (records: Manufactory[]) => void
+  onAiImport: (records: Manufactory[]) => void | Promise<void>
+  onBulkImport: (records: Manufactory[]) => void | Promise<void>
 }) {
   return (
     <section className="sourcing-layout">
@@ -760,7 +849,7 @@ function RecordForm({
 }: {
   initialRecord: Manufactory
   onCancel: () => void
-  onSave: (record: Manufactory) => void
+  onSave: (record: Manufactory) => void | Promise<void>
 }) {
   const [draft, setDraft] = useState(initialRecord)
 
