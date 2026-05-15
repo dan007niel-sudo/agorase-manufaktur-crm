@@ -171,3 +171,52 @@ create table if not exists web_ops_items (
 create index if not exists web_ops_items_release_id_idx on web_ops_items (release_id);
 create index if not exists web_ops_items_status_idx on web_ops_items (status);
 create index if not exists web_ops_items_kind_idx on web_ops_items (kind);
+
+create table if not exists creative_briefs (
+  id text primary key,
+  title text not null,
+  goal text not null default '',
+  audience text not null default '',
+  tone text not null default '',
+  "references" text not null default '',
+  season text not null default '',
+  release_id text not null default '',
+  status text not null,
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists creative_briefs_status_idx on creative_briefs (status);
+create index if not exists creative_briefs_release_id_idx on creative_briefs (release_id);
+
+create table if not exists creative_directions (
+  id text primary key,
+  brief_id text not null,
+  title text not null,
+  summary text not null default '',
+  body text not null default '',
+  keywords text not null default '',
+  palette text not null default '',
+  materials text not null default '',
+  silhouettes text not null default '',
+  prompt_used text not null default '',
+  model_used text not null default '',
+  source text not null,
+  saved boolean not null default true,
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists creative_directions_brief_id_idx on creative_directions (brief_id);
+
+create table if not exists prompt_templates (
+  id text primary key,
+  name text not null,
+  description text not null default '',
+  category text not null default '',
+  body text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);

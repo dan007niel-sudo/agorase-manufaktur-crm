@@ -11,12 +11,15 @@ import { RecordForm } from './components/FormControls'
 import { seedManufactories } from './data'
 import { calculateMetrics, createEmptyManufacture, deriveTasks, upsertManufacture } from './crmUtils'
 import { fashionOsModules, type FashionOsModule } from './fashionOs'
+import { listCreativeBriefs, listCreativeDirections } from './api/creativeApi'
 import { importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
 import { listProductionProfiles } from './api/productionApi'
-import { listReleaseTasks } from './api/releasesApi'
+import { listReleases, listReleaseTasks } from './api/releasesApi'
 import { listTasks, saveTask } from './api/tasksApi'
 import { listWebOpsItems } from './api/webOpsApi'
 import { CommandCenter } from './sections/command/CommandCenter'
+import { CreativeLabView } from './sections/creativeLab/CreativeLabView'
+import { createCreativeCommandTasks } from './sections/creativeLab/creativeTasks'
 import { WorkspaceFoundation } from './sections/foundation/WorkspaceFoundation'
 import { PartnersView } from './sections/partners/PartnersView'
 import { ProductionView } from './sections/production/ProductionView'
@@ -26,7 +29,15 @@ import { SettingsView } from './sections/settings/SettingsView'
 import { SourcingView } from './sections/sourcing/SourcingView'
 import { WebOpsView } from './sections/webOps/WebOpsView'
 import { createWebOpsCommandTasks } from './sections/webOps/webOpsTasks'
-import type { OperationalTask, ProductionProfile, ReleaseTask, WebOpsItem } from '@agorase/shared'
+import type {
+  CreativeBrief,
+  CreativeDirection,
+  FashionRelease,
+  OperationalTask,
+  ProductionProfile,
+  ReleaseTask,
+  WebOpsItem,
+} from '@agorase/shared'
 import type { Category, CrmTask, Manufactory, PipelineStatus } from './types'
 
 type Section = FashionOsModule['section']
@@ -41,8 +52,11 @@ function App() {
   const [recordsError, setRecordsError] = useState('')
   const [persistedTasks, setPersistedTasks] = useState<OperationalTask[]>([])
   const [productionProfiles, setProductionProfiles] = useState<ProductionProfile[]>([])
+  const [releases, setReleases] = useState<FashionRelease[]>([])
   const [releaseTasks, setReleaseTasks] = useState<ReleaseTask[]>([])
   const [webOpsItems, setWebOpsItems] = useState<WebOpsItem[]>([])
+  const [creativeBriefs, setCreativeBriefs] = useState<CreativeBrief[]>([])
+  const [creativeDirections, setCreativeDirections] = useState<CreativeDirection[]>([])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'Alle' | Category>('Alle')
@@ -85,6 +99,15 @@ function App() {
     .concat(createProductionBlockerTasks(productionProfiles, records, persistedTasksById))
     .concat(createReleaseLaunchTasks(releaseTasks, persistedTasksById, today))
     .concat(createWebOpsCommandTasks(webOpsItems, persistedTasksById, today))
+    .concat(
+      createCreativeCommandTasks({
+        briefs: creativeBriefs,
+        directions: creativeDirections,
+        releases,
+        persistedTasksById,
+        today,
+      }),
+    )
   const openTaskCount = tasks.filter((task) => !task.completed).length
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
 
@@ -102,17 +125,31 @@ function App() {
         setRecordsStatus('ready')
         setRecordsError('')
         try {
-          const [loadedTasks, loadedProfiles, loadedReleaseTasks, loadedWebOpsItems] = await Promise.all([
+          const [
+            loadedTasks,
+            loadedProfiles,
+            loadedReleases,
+            loadedReleaseTasks,
+            loadedWebOpsItems,
+            loadedCreativeBriefs,
+            loadedCreativeDirections,
+          ] = await Promise.all([
             listTasks(),
             listProductionProfiles(),
+            listReleases(),
             listReleaseTasks(),
             listWebOpsItems(),
+            listCreativeBriefs(),
+            listCreativeDirections(),
           ])
           if (active) {
             setPersistedTasks(loadedTasks)
             setProductionProfiles(loadedProfiles)
+            setReleases(loadedReleases)
             setReleaseTasks(loadedReleaseTasks)
             setWebOpsItems(loadedWebOpsItems)
+            setCreativeBriefs(loadedCreativeBriefs)
+            setCreativeDirections(loadedCreativeDirections)
           }
         } catch (caught) {
           if (!active) return
@@ -248,7 +285,7 @@ function App() {
         {activeSection === 'Production' && (
           <ProductionView module={activeModule} records={filteredRecords} onSelect={setSelectedId} onPatch={saveRecord} />
         )}
-        {activeSection === 'Creative Lab' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Creative Lab' && <CreativeLabView module={activeModule} />}
         {activeSection === 'Mockups' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Legal Orientation' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Releases' && <ReleasesView module={activeModule} records={filteredRecords} />}

@@ -38,22 +38,6 @@ export interface PartnerResearchResponse {
   suggestions: PartnerResearchSuggestion[]
 }
 
-export interface BrainstormRequest {
-  brief: string
-  audience: string
-  constraints: string
-}
-
-export interface BrainstormResponse {
-  directions: Array<{
-    title: string
-    concept: string
-    productIdeas: string[]
-    visualLanguage: string
-    risks: string[]
-  }>
-}
-
 export interface ImageGenerationRequest {
   prompt: string
   aspectRatio: '1:1' | '4:5' | '3:4' | '16:9'

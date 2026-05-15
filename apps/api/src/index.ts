@@ -2,10 +2,13 @@ import { readEnv, type ApiEnv } from './env.js'
 import { verifySessionCookie } from './auth/session.js'
 import { createDbPool } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
+import { createPostgresCreativeBriefsRepository } from './db/creativeBriefsRepository.js'
+import { createPostgresCreativeDirectionsRepository } from './db/creativeDirectionsRepository.js'
 import { createPostgresPartnerEvaluationsRepository } from './db/partnerEvaluationsRepository.js'
 import { createPostgresPartnerEventsRepository } from './db/partnerEventsRepository.js'
 import { createPostgresPartnersRepository } from './db/partnersRepository.js'
 import { createPostgresProductionProfilesRepository } from './db/productionProfilesRepository.js'
+import { createPostgresPromptTemplatesRepository } from './db/promptTemplatesRepository.js'
 import { createPostgresReleasePartnersRepository } from './db/releasePartnersRepository.js'
 import { createPostgresReleaseTasksRepository } from './db/releaseTasksRepository.js'
 import { createPostgresReleasesRepository } from './db/releasesRepository.js'
@@ -15,6 +18,12 @@ import { createPostgresWebOpsItemsRepository } from './db/webOpsItemsRepository.
 import { errorResponse, jsonResponse, resolveOrigin } from './http.js'
 import { healthRoute } from './routes/health.js'
 import { authRoute } from './routes/auth.js'
+import {
+  creativeRoute,
+  type CreativeBriefsRepository,
+  type CreativeDirectionsRepository,
+  type PromptTemplatesRepository,
+} from './routes/creative.js'
 import { mockupsRoute } from './routes/mockups.js'
 import { partnerEvaluationsRoute, type PartnerEvaluationsRepository } from './routes/partnerEvaluations.js'
 import { partnerEventsRoute, type PartnerEventsRepository } from './routes/partnerEvents.js'
@@ -28,7 +37,6 @@ import {
 } from './routes/releases.js'
 import { researchRoute } from './routes/research.js'
 import { tasksRoute, type TasksRepository } from './routes/tasks.js'
-import { visualizeRoute } from './routes/visualize.js'
 import { webOpsRoute, type WebOpsItemsRepository } from './routes/webOps.js'
 
 export interface ApiContext {
@@ -43,6 +51,9 @@ export interface ApiContext {
   releaseTasksRepository?: ReleaseTasksRepository
   releasePartnersRepository?: ReleasePartnersRepository
   webOpsItemsRepository?: WebOpsItemsRepository
+  creativeBriefsRepository?: CreativeBriefsRepository
+  creativeDirectionsRepository?: CreativeDirectionsRepository
+  promptTemplatesRepository?: PromptTemplatesRepository
 }
 
 export async function handleRequest(request: Request, contextOrEnv: ApiEnv | ApiContext = readEnv()) {
@@ -61,8 +72,17 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
     return errorResponse('unauthorized', 'Authentication required.', 401, origin)
   }
   if (pathname === '/api/research/partners' && request.method === 'POST') return researchRoute(request, env)
-  if (pathname === '/api/visualize' && request.method === 'POST') return visualizeRoute(request, env)
   if (pathname === '/api/mockups/generate' && request.method === 'POST') return mockupsRoute(request, env)
+  if (pathname === '/api/creative' || pathname.startsWith('/api/creative/')) {
+    if (!context.creativeBriefsRepository || !context.creativeDirectionsRepository || !context.promptTemplatesRepository) {
+      return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    }
+    return creativeRoute(request, env, {
+      briefs: context.creativeBriefsRepository,
+      directions: context.creativeDirectionsRepository,
+      templates: context.promptTemplatesRepository,
+    })
+  }
   if (pathname === '/api/partners' || pathname.startsWith('/api/partners/')) {
     if (!context.partnersRepository) {
       return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
@@ -132,8 +152,9 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith('/api/releases/') ||
     pathname === '/api/web-ops' ||
     pathname.startsWith('/api/web-ops/') ||
+    pathname === '/api/creative' ||
+    pathname.startsWith('/api/creative/') ||
     pathname === '/api/research/partners' ||
-    pathname === '/api/visualize' ||
     pathname === '/api/mockups/generate'
   )
 }
@@ -155,6 +176,9 @@ if (process.env.NODE_ENV !== 'test') {
     releaseTasksRepository: pool ? createPostgresReleaseTasksRepository(pool) : undefined,
     releasePartnersRepository: pool ? createPostgresReleasePartnersRepository(pool) : undefined,
     webOpsItemsRepository: pool ? createPostgresWebOpsItemsRepository(pool) : undefined,
+    creativeBriefsRepository: pool ? createPostgresCreativeBriefsRepository(pool) : undefined,
+    creativeDirectionsRepository: pool ? createPostgresCreativeDirectionsRepository(pool) : undefined,
+    promptTemplatesRepository: pool ? createPostgresPromptTemplatesRepository(pool) : undefined,
   }
   const server = await import('node:http')
   server
