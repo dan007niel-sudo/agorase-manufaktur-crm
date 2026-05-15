@@ -24,6 +24,7 @@ Current product direction:
 - Phase 1: Foundation, deployed web + API, secure Gemini proxy.
 - Phase 2A: Persistent partner data via Render Postgres.
 - Phase 2B: Admin login with secure session cookie.
+- Phase 3: Complete all Fashion OS sections into persistent, useful, admin-only workflows.
 
 ## Current Live URLs
 
@@ -41,19 +42,21 @@ As of the last update:
 - Branch: `main`
 - Remote: `origin`
 - Local `main` was clean and in sync with `origin/main`
-- Latest pushed commit:
-  - `85a9f8e docs: plan phase 2b admin login`
+- Latest pushed app commit before completion planning:
+  - `2ccb72c docs: document admin login deployment`
 
 Recent important commits:
 
-- `85a9f8e docs: plan phase 2b admin login`
-- `1f29d6a docs: specify phase 2b admin login`
+- `2ccb72c docs: document admin login deployment`
+- `03f744a feat: gate web app behind admin login`
+- `971158e feat: add admin auth client`
+- `9c1640c feat: protect product api routes`
+- `2ac0c79 feat: add admin auth routes`
+- `5f15566 feat: add signed admin session cookies`
+- `a88cb8d chore: configure admin auth env`
 - `02f94e3 docs: document persistent partner deployment`
 - `4f0e2e2 feat: sync partners through api`
 - `1598023 fix: load migrations from built api`
-- `bcd6a73 feat: add partner api client`
-- `fdc26f8 feat: initialize partner database on api startup`
-- `97602a2 feat: add partner api routes`
 
 ## Current Product State
 
@@ -73,11 +76,20 @@ Phase 2A is live:
 - Web route `/partners` returned `200`.
 - Partner data is now persistent across browser sessions and deploys.
 
-Phase 2B is planned but not implemented:
+Phase 2B is live:
 
-- Goal: single admin login with `HttpOnly` session cookie.
-- Specs and plan are committed.
-- Implementation had not started when this handoff was written.
+- Admin login uses a server-issued `HttpOnly` session cookie.
+- `ADMIN_PASSWORD` and `SESSION_SECRET` are set on the Render API service.
+- Product API routes are protected.
+- Live unauthenticated `GET /api/partners` returns `401`.
+- Live invalid login returns `401 Authentication failed`, confirming auth env is active.
+- `GET /api/auth/session` returns `{"authenticated":false}` when not logged in.
+
+Phase 3 is planned but not implemented:
+
+- Completion design and master plan have been drafted.
+- Next implementation phase is Phase 3A: split the large web app into focused app shell, section, API, and component modules before adding more features.
+- Do not build the remaining feature areas directly inside the current large `App.tsx`.
 
 ## Important Files
 
@@ -86,6 +98,8 @@ Project docs:
 - `SESSION_HANDOFF.md`: this file.
 - `README.md`: general setup and deployment notes.
 - `docs/deployment/render-readiness.md`: Render checklist.
+- `docs/superpowers/specs/2026-05-15-agorase-fashion-os-completion-design.md`
+- `docs/superpowers/plans/2026-05-15-agorase-fashion-os-completion-master-plan.md`
 - `docs/superpowers/specs/2026-05-14-phase-2a-persistent-partners-design.md`
 - `docs/superpowers/plans/2026-05-14-phase-2a-persistent-partners.md`
 - `docs/superpowers/specs/2026-05-14-phase-2b-admin-login-design.md`
@@ -105,7 +119,7 @@ Phase 2A implementation:
 - `apps/web/src/partnersApi.ts`: frontend partner API client.
 - `apps/web/src/App.tsx`: app state, API sync, Settings seed action.
 
-Planned Phase 2B implementation files:
+Phase 2B implementation files:
 
 - `packages/shared/src/api.ts`
 - `.env.example`
@@ -124,6 +138,15 @@ Planned Phase 2B implementation files:
 - `apps/web/src/App.css`
 - `README.md`
 - `docs/deployment/render-readiness.md`
+
+Current Phase 3 target areas:
+
+- `apps/web/src/App.tsx`: currently too large; split before more feature work.
+- `apps/web/src/fashionOs.ts`: sidebar module definitions.
+- `apps/api/src/routes/mockups.ts`: placeholder image-generation route.
+- `apps/api/src/routes/visualize.ts`: placeholder creative route.
+- `packages/shared/src/ai.ts`: existing AI request/response contracts.
+- `packages/shared/src/fashion.ts`: current broader Fashion OS types.
 
 ## What Went Wrong / Lessons Learned
 
@@ -167,6 +190,20 @@ Phase 2B start:
 - A Phase 2B implementation worktree had not yet been created.
 - The user asked for this handoff before more implementation work started.
 
+Phase 2B deployment:
+
+- After merge/push, Render briefly served the old API version.
+- Polling showed the API switched to the new version when unauthenticated `/api/partners` changed from `200` to `401`.
+- Before Render picked up `ADMIN_PASSWORD` and `SESSION_SECRET`, login returned `503 auth_not_configured`.
+- After the user set API env vars and Render restarted, invalid login returned `401 Authentication failed`.
+- This confirmed both auth env values were active without exposing the real admin password.
+
+Phase 3 planning:
+
+- The app has enough placeholder sections that the next work should not jump straight into feature code.
+- First reduce `App.tsx` coupling, then add persistent operational domains one at a time.
+- Current completion plan deliberately decomposes the remaining app into child specs/plans instead of one huge implementation.
+
 ## Existing Worktrees
 
 At one point these old worktrees existed:
@@ -176,7 +213,7 @@ At one point these old worktrees existed:
 - `.worktrees/fashion-os-monorepo`
 - `.worktrees/fashion-os-ui`
 
-The Phase 2A worktree was removed after Phase 2A was merged/pushed.
+The Phase 2A and Phase 2B worktrees were removed after their branches were merged/pushed.
 
 Before starting new work, run:
 
@@ -185,10 +222,10 @@ git status --short --branch
 git worktree list
 ```
 
-For Phase 2B implementation, create a fresh worktree such as:
+For Phase 3A implementation, create a fresh worktree such as:
 
 ```bash
-git worktree add .worktrees/phase-2b-admin-login -b codex/phase-2b-admin-login
+git worktree add .worktrees/phase-3a-app-architecture -b codex/phase-3a-app-architecture
 ```
 
 ## Verification Already Passed
@@ -218,29 +255,67 @@ Live Phase 2A smoke checks:
 - `POST /api/partners/import`: `200`.
 - `/partners` web route: `200`.
 
+For Phase 2B before deployment:
+
+```bash
+npm test
+npm run typecheck
+npm run build
+npm run lint
+rg 'ADMIN_PASSWORD|SESSION_SECRET|DATABASE_URL|GEMINI_API_KEY|GOOGLE_API_KEY|x-goog-api-key|AIza' apps/web/dist || true
+```
+
+Results:
+
+- `npm test`: 37 test files, 187 tests passed on merged `main`.
+- Typecheck passed.
+- Build passed.
+- Lint passed.
+- Web bundle secret scan had no output.
+
+Live Phase 2B smoke checks:
+
+- `GET /api/health`: `200`.
+- Unauthenticated `GET /api/partners`: `401 unauthorized`.
+- `GET /api/auth/session`: `{"authenticated":false}` when not logged in.
+- Invalid `POST /api/auth/login`: `401 Authentication failed` after Render env was active.
+- Web app loads at `https://agorase-fashion-os-web.onrender.com`.
+
 ## Next Planned Work
 
-Implement Phase 2B from:
+Execute Phase 3 from:
 
-- `docs/superpowers/specs/2026-05-14-phase-2b-admin-login-design.md`
-- `docs/superpowers/plans/2026-05-14-phase-2b-admin-login.md`
+- `docs/superpowers/specs/2026-05-15-agorase-fashion-os-completion-design.md`
+- `docs/superpowers/plans/2026-05-15-agorase-fashion-os-completion-master-plan.md`
 
 Recommended next steps:
 
-1. Create a new isolated worktree for Phase 2B.
-2. Run baseline tests.
-3. Execute Task 1 in the Phase 2B plan:
-   - shared auth response type
-   - API auth env
-   - Render secret placeholders
-4. Continue through the plan task-by-task with tests and commits.
-5. After deploy, set these API-only Render secrets:
-   - `ADMIN_PASSWORD`
-   - `SESSION_SECRET`
-6. Live smoke-test:
-   - unauthenticated `/api/partners` returns `401`
-   - login returns authenticated session cookie
-   - authenticated `/api/partners` returns persisted seed records
+1. Create a fresh isolated worktree for Phase 3A:
+   - `git worktree add .worktrees/phase-3a-app-architecture -b codex/phase-3a-app-architecture`
+2. Run baseline verification:
+   - `npm test`
+   - `npm run typecheck`
+   - `npm run build`
+   - `npm run lint`
+3. Write the child spec:
+   - `docs/superpowers/specs/2026-05-15-phase-3a-app-architecture-design.md`
+4. Write the child implementation plan:
+   - `docs/superpowers/plans/2026-05-15-phase-3a-app-architecture.md`
+5. Implement Phase 3A with TDD:
+   - split `apps/web/src/App.tsx`
+   - preserve current behavior
+   - keep auth gate and partner workflows working
+   - do not add new product features during this refactor
+6. Continue through completion master plan phases:
+   - Phase 3B operational data foundation
+   - Phase 3C production workspace
+   - Phase 3G releases
+   - Phase 3H web ops
+   - Phase 3D creative lab
+   - Phase 3E mockups
+   - Phase 3F legal orientation
+   - Phase 3I settings/export/diagnostics
+   - Phase 3J polish, QA, and live completion
 
 ## Important Security Notes
 
