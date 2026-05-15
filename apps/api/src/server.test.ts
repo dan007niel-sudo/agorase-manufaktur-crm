@@ -93,6 +93,34 @@ describe('API server', () => {
     expect(env.nodeEnv).toBe('production')
   })
 
+  it('rejects login when auth is not configured', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/auth/login', { method: 'POST', body: JSON.stringify({ password: 'pw' }) }),
+      readEnv({}),
+    )
+
+    expect(response.status).toBe(503)
+  })
+
+  it('rejects invalid admin passwords', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/auth/login', { method: 'POST', body: JSON.stringify({ password: 'bad' }) }),
+      readEnv({ ADMIN_PASSWORD: 'good', SESSION_SECRET: 'secret' }),
+    )
+
+    expect(response.status).toBe(401)
+  })
+
+  it('sets a session cookie for valid admin login', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/auth/login', { method: 'POST', body: JSON.stringify({ password: 'good' }) }),
+      readEnv({ ADMIN_PASSWORD: 'good', SESSION_SECRET: 'secret' }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('set-cookie')).toContain('agorase_session=')
+  })
+
   it('uses allow-listed origins for CORS responses', async () => {
     const response = await handleRequest(
       new Request('http://localhost/api/health', {

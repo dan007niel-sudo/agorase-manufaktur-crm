@@ -20,7 +20,12 @@ export function resolveOrigin(request: Request, allowedOrigins: string[]) {
   return allowedOrigins.includes(origin) ? origin : fallback
 }
 
-export function jsonResponse(body: unknown, status = 200, origin = DEFAULT_ORIGIN) {
+export function jsonResponse<T>(
+  body: T,
+  status = 200,
+  origin = DEFAULT_ORIGIN,
+  headers: Record<string, string> = {},
+) {
   return new Response(status === 204 ? null : JSON.stringify(body), {
     status,
     headers: {
@@ -29,6 +34,7 @@ export function jsonResponse(body: unknown, status = 200, origin = DEFAULT_ORIGI
       'access-control-allow-methods': 'GET,POST,OPTIONS',
       'access-control-allow-headers': 'content-type',
       'vary': 'Origin',
+      ...headers,
     },
   })
 }

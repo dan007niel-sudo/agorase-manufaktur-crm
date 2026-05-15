@@ -4,6 +4,7 @@ import { runMigrations } from './db/migrate.js'
 import { createPostgresPartnersRepository } from './db/partnersRepository.js'
 import { errorResponse, jsonResponse, resolveOrigin } from './http.js'
 import { healthRoute } from './routes/health.js'
+import { authRoute } from './routes/auth.js'
 import { mockupsRoute } from './routes/mockups.js'
 import { partnersRoute, type PartnersRepository } from './routes/partners.js'
 import { researchRoute } from './routes/research.js'
@@ -23,6 +24,9 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
 
   if (request.method === 'OPTIONS') return jsonResponse({}, 204, origin)
   if (pathname === '/api/health' && request.method === 'GET') return healthRoute(request, env)
+  if (pathname === '/api/auth/login' || pathname === '/api/auth/logout' || pathname === '/api/auth/session') {
+    return authRoute(request, env)
+  }
   if (pathname === '/api/research/partners' && request.method === 'POST') return researchRoute(request, env)
   if (pathname === '/api/visualize' && request.method === 'POST') return visualizeRoute(request, env)
   if (pathname === '/api/mockups/generate' && request.method === 'POST') return mockupsRoute(request, env)
