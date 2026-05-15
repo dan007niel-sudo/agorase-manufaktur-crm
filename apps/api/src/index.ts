@@ -1,4 +1,5 @@
 import { readEnv, type ApiEnv } from './env.js'
+import { verifySessionCookie } from './auth/session.js'
 import { createDbPool } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
 import { createPostgresPartnersRepository } from './db/partnersRepository.js'
@@ -27,6 +28,9 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
   if (pathname === '/api/auth/login' || pathname === '/api/auth/logout' || pathname === '/api/auth/session') {
     return authRoute(request, env)
   }
+  if (isProtectedPath(pathname) && !verifySessionCookie(request.headers.get('cookie'), env)) {
+    return errorResponse('unauthorized', 'Authentication required.', 401, origin)
+  }
   if (pathname === '/api/research/partners' && request.method === 'POST') return researchRoute(request, env)
   if (pathname === '/api/visualize' && request.method === 'POST') return visualizeRoute(request, env)
   if (pathname === '/api/mockups/generate' && request.method === 'POST') return mockupsRoute(request, env)
@@ -42,6 +46,16 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
 
 function toContext(contextOrEnv: ApiEnv | ApiContext): ApiContext {
   return 'env' in contextOrEnv ? contextOrEnv : { env: contextOrEnv }
+}
+
+function isProtectedPath(pathname: string) {
+  return (
+    pathname === '/api/partners' ||
+    pathname.startsWith('/api/partners/') ||
+    pathname === '/api/research/partners' ||
+    pathname === '/api/visualize' ||
+    pathname === '/api/mockups/generate'
+  )
 }
 
 const env = readEnv()

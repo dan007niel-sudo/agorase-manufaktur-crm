@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Manufactory } from '@agorase/shared'
 import { readEnv } from './env.js'
+import { buildSessionCookie } from './auth/session.js'
 import { handleRequest } from './index.js'
 import { buildPartnerResearchPrompt, hasGeminiConfig } from './providers/gemini.js'
 
@@ -44,6 +45,14 @@ describe('API server', () => {
     }
   }
 
+  function authenticatedEnv(source: Record<string, string | undefined> = {}) {
+    return readEnv({ ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'secret', ...source })
+  }
+
+  function authenticatedHeaders(env = authenticatedEnv()) {
+    return { cookie: buildSessionCookie(env) }
+  }
+
   it('reports missing Gemini config without exposing secrets', async () => {
     const response = await handleRequest(new Request('http://localhost/api/health'), readEnv({}))
     const body = await response.json()
@@ -54,12 +63,14 @@ describe('API server', () => {
   })
 
   it('rejects research calls when Gemini is not configured', async () => {
+    const env = authenticatedEnv()
     const response = await handleRequest(
       new Request('http://localhost/api/research/partners', {
         method: 'POST',
+        headers: authenticatedHeaders(env),
         body: JSON.stringify({ count: 3, categories: [], regions: '', productFocus: '', priceLevel: 'Alle' }),
       }),
-      readEnv({}),
+      env,
     )
 
     expect(response.status).toBe(503)
@@ -133,6 +144,18 @@ describe('API server', () => {
     expect(response.headers.get('access-control-allow-origin')).not.toBe('*')
   })
 
+  it('includes credential-aware CORS headers', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/health', {
+        headers: { origin: 'https://app.agorase.com' },
+      }),
+      readEnv({ ALLOWED_ORIGINS: 'https://app.agorase.com,http://localhost:5173' }),
+    )
+
+    expect(response.headers.get('access-control-allow-credentials')).toBe('true')
+    expect(response.headers.get('access-control-allow-methods')).toContain('DELETE')
+  })
+
   it('does not echo disallowed origins', async () => {
     const response = await handleRequest(
       new Request('http://localhost/api/health', {
@@ -144,15 +167,38 @@ describe('API server', () => {
     expect(response.headers.get('access-control-allow-origin')).toBe('https://app.agorase.com')
   })
 
+  it('rejects unauthenticated partner API requests', async () => {
+    const response = await handleRequest(new Request('http://localhost/api/partners'), {
+      env: readEnv({ ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'secret' }),
+      partnersRepository: fakePartnersRepository(),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('allows authenticated partner API requests', async () => {
+    const login = await handleRequest(
+      new Request('http://localhost/api/auth/login', { method: 'POST', body: JSON.stringify({ password: 'pw' }) }),
+      readEnv({ ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'secret' }),
+    )
+    const response = await handleRequest(
+      new Request('http://localhost/api/partners', { headers: { cookie: login.headers.get('set-cookie') ?? '' } }),
+      { env: readEnv({ ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'secret' }), partnersRepository: fakePartnersRepository() },
+    )
+
+    expect(response.status).toBe(200)
+  })
+
   it('rejects oversized JSON requests before provider calls', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const env = authenticatedEnv({ GEMINI_API_KEY: 'test-key' })
     const response = await handleRequest(
       new Request('http://localhost/api/research/partners', {
         method: 'POST',
-        headers: { 'content-length': '100001' },
+        headers: { 'content-length': '100001', ...authenticatedHeaders(env) },
         body: JSON.stringify({ count: 3, categories: [], regions: '', productFocus: '', priceLevel: 'Alle' }),
       }),
-      readEnv({ GEMINI_API_KEY: 'test-key' }),
+      env,
     )
 
     expect(response.status).toBe(413)
@@ -163,6 +209,7 @@ describe('API server', () => {
   })
 
   it('sends Gemini API keys in headers instead of query strings', async () => {
+    const env = authenticatedEnv({ GEMINI_API_KEY: 'test-secret' })
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"suggestions":[]}' }] } }] }), {
         status: 200,
@@ -173,9 +220,10 @@ describe('API server', () => {
     const response = await handleRequest(
       new Request('http://localhost/api/research/partners', {
         method: 'POST',
+        headers: authenticatedHeaders(env),
         body: JSON.stringify({ count: 3, categories: [], regions: '', productFocus: '', priceLevel: 'Alle' }),
       }),
-      readEnv({ GEMINI_API_KEY: 'test-secret' }),
+      env,
     )
 
     expect(response.status).toBe(200)
@@ -186,6 +234,7 @@ describe('API server', () => {
   })
 
   it('accepts trailing slash research requests', async () => {
+    const env = authenticatedEnv({ GEMINI_API_KEY: 'test-secret' })
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"suggestions":[]}' }] } }] }), {
         status: 200,
@@ -196,15 +245,17 @@ describe('API server', () => {
     const response = await handleRequest(
       new Request('http://localhost/api/research/partners/', {
         method: 'POST',
+        headers: authenticatedHeaders(env),
         body: JSON.stringify({ count: 3, categories: [], regions: '', productFocus: '', priceLevel: 'Alle' }),
       }),
-      readEnv({ GEMINI_API_KEY: 'test-secret' }),
+      env,
     )
 
     expect(response.status).toBe(200)
   })
 
   it('hides provider error details from frontend responses', async () => {
+    const env = authenticatedEnv({ GEMINI_API_KEY: 'test-secret' })
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ error: { message: 'raw provider secret failure' } }), {
         status: 500,
@@ -215,9 +266,10 @@ describe('API server', () => {
     const response = await handleRequest(
       new Request('http://localhost/api/research/partners', {
         method: 'POST',
+        headers: authenticatedHeaders(env),
         body: JSON.stringify({ count: 3, categories: [], regions: '', productFocus: '', priceLevel: 'Alle' }),
       }),
-      readEnv({ GEMINI_API_KEY: 'test-secret' }),
+      env,
     )
     const body = await response.json()
 
@@ -229,9 +281,10 @@ describe('API server', () => {
   })
 
   it('lists partners from the repository', async () => {
+    const env = authenticatedEnv({ DATABASE_URL: 'postgresql://example/internal' })
     const partnersRepository = fakePartnersRepository([testPartner])
-    const response = await handleRequest(new Request('http://localhost/api/partners'), {
-      env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+    const response = await handleRequest(new Request('http://localhost/api/partners', { headers: authenticatedHeaders(env) }), {
+      env,
       partnersRepository,
     })
 
@@ -241,14 +294,16 @@ describe('API server', () => {
   })
 
   it('saves one partner through the repository', async () => {
+    const env = authenticatedEnv({ DATABASE_URL: 'postgresql://example/internal' })
     const partnersRepository = fakePartnersRepository()
     const response = await handleRequest(
       new Request('http://localhost/api/partners', {
         method: 'POST',
+        headers: authenticatedHeaders(env),
         body: JSON.stringify(testPartner),
       }),
       {
-        env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+        env,
         partnersRepository,
       },
     )
@@ -259,14 +314,16 @@ describe('API server', () => {
   })
 
   it('updates one partner through the repository', async () => {
+    const env = authenticatedEnv({ DATABASE_URL: 'postgresql://example/internal' })
     const partnersRepository = fakePartnersRepository()
     const response = await handleRequest(
       new Request('http://localhost/api/partners/atelier-forma', {
         method: 'PUT',
+        headers: authenticatedHeaders(env),
         body: JSON.stringify({ status: 'Antwort erhalten' }),
       }),
       {
-        env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+        env,
         partnersRepository,
       },
     )
@@ -276,25 +333,31 @@ describe('API server', () => {
   })
 
   it('deletes one partner through the repository', async () => {
+    const env = authenticatedEnv({ DATABASE_URL: 'postgresql://example/internal' })
     const partnersRepository = fakePartnersRepository()
-    const response = await handleRequest(new Request('http://localhost/api/partners/atelier-forma', { method: 'DELETE' }), {
-      env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
-      partnersRepository,
-    })
+    const response = await handleRequest(
+      new Request('http://localhost/api/partners/atelier-forma', { method: 'DELETE', headers: authenticatedHeaders(env) }),
+      {
+        env,
+        partnersRepository,
+      },
+    )
 
     expect(response.status).toBe(204)
     expect(partnersRepository.delete).toHaveBeenCalledWith('atelier-forma')
   })
 
   it('imports partners through the repository', async () => {
+    const env = authenticatedEnv({ DATABASE_URL: 'postgresql://example/internal' })
     const partnersRepository = fakePartnersRepository()
     const response = await handleRequest(
       new Request('http://localhost/api/partners/import', {
         method: 'POST',
+        headers: authenticatedHeaders(env),
         body: JSON.stringify({ partners: [testPartner] }),
       }),
       {
-        env: readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+        env,
         partnersRepository,
       },
     )
@@ -305,9 +368,10 @@ describe('API server', () => {
   })
 
   it('returns a normalized database error when partners are requested without a repository', async () => {
+    const env = authenticatedEnv({ DATABASE_URL: 'postgresql://example/internal' })
     const response = await handleRequest(
-      new Request('http://localhost/api/partners'),
-      readEnv({ DATABASE_URL: 'postgresql://example/internal' }),
+      new Request('http://localhost/api/partners', { headers: authenticatedHeaders(env) }),
+      env,
     )
 
     expect(response.status).toBe(503)

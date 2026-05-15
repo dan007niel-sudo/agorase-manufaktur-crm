@@ -31,8 +31,9 @@ export function jsonResponse<T>(
     headers: {
       'content-type': 'application/json',
       'access-control-allow-origin': origin,
-      'access-control-allow-methods': 'GET,POST,OPTIONS',
+      'access-control-allow-methods': 'GET,POST,PUT,DELETE,OPTIONS',
       'access-control-allow-headers': 'content-type',
+      'access-control-allow-credentials': 'true',
       'vary': 'Origin',
       ...headers,
     },
