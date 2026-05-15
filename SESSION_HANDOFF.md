@@ -42,11 +42,15 @@ As of the last update:
 - Branch: `main`
 - Remote: `origin`
 - Local `main` was clean and in sync with `origin/main`
-- Latest pushed app commit before completion planning:
-  - `2ccb72c docs: document admin login deployment`
+- Latest pushed app commit:
+  - `26e9712 feat: build release planning workspace`
 
 Recent important commits:
 
+- `26e9712 feat: build release planning workspace`
+- `d4f5382 feat: build production workspace`
+- `6373e14 feat: add persistent operational records`
+- `d73dd8d refactor: split web app shell and sections`
 - `2ccb72c docs: document admin login deployment`
 - `03f744a feat: gate web app behind admin login`
 - `971158e feat: add admin auth client`
@@ -85,11 +89,13 @@ Phase 2B is live:
 - Live invalid login returns `401 Authentication failed`, confirming auth env is active.
 - `GET /api/auth/session` returns `{"authenticated":false}` when not logged in.
 
-Phase 3 is planned but not implemented:
+Phase 3 is partially live:
 
-- Completion design and master plan have been drafted.
-- Next implementation phase is Phase 3A: split the large web app into focused app shell, section, API, and component modules before adding more features.
-- Do not build the remaining feature areas directly inside the current large `App.tsx`.
+- Phase 3A App Architecture is live: `App.tsx` is split into App Shell, Auth Gate, sections, API clients, and shared UI components.
+- Phase 3B Operational Data is live: persistent operational tasks, partner events, and partner evaluations.
+- Phase 3C Production Workspace is live: production profiles, sample requests, readiness, and Command Center production blockers.
+- Phase 3G Releases is live: persistent releases, release tasks, linked partners, content readiness, and Command Center launch tasks.
+- Remaining planned areas: Web Ops, Creative Lab, Mockups, Legal Orientation, Settings/export/diagnostics, and final polish.
 
 ## Important Files
 
@@ -141,12 +147,15 @@ Phase 2B implementation files:
 
 Current Phase 3 target areas:
 
-- `apps/web/src/App.tsx`: currently too large; split before more feature work.
+- `apps/web/src/App.tsx`: now handles high-level app state and section routing after Phase 3A split.
 - `apps/web/src/fashionOs.ts`: sidebar module definitions.
 - `apps/api/src/routes/mockups.ts`: placeholder image-generation route.
 - `apps/api/src/routes/visualize.ts`: placeholder creative route.
 - `packages/shared/src/ai.ts`: existing AI request/response contracts.
 - `packages/shared/src/fashion.ts`: current broader Fashion OS types.
+- `packages/shared/src/releases.ts`: Phase 3G release planning contracts.
+- `apps/api/src/routes/releases.ts`: protected Phase 3G release API.
+- `apps/web/src/sections/releases/ReleasesView.tsx`: Phase 3G release planning UI.
 
 ## What Went Wrong / Lessons Learned
 
@@ -198,11 +207,18 @@ Phase 2B deployment:
 - After the user set API env vars and Render restarted, invalid login returned `401 Authentication failed`.
 - This confirmed both auth env values were active without exposing the real admin password.
 
-Phase 3 planning:
+Phase 3 planning and implementation:
 
-- The app has enough placeholder sections that the next work should not jump straight into feature code.
-- First reduce `App.tsx` coupling, then add persistent operational domains one at a time.
-- Current completion plan deliberately decomposes the remaining app into child specs/plans instead of one huge implementation.
+- Phase 3A, 3B, 3C, and 3G were implemented in isolated worktrees, merged to `main`, pushed, and live-smoked.
+- Continue using one child spec and one child implementation plan per phase.
+- Remaining placeholder sections should be implemented as focused persistent workspaces, not by adding large feature blocks back into `App.tsx`.
+
+Phase 3G deployment:
+
+- After merge/push, Render briefly served the old API version and `/api/releases` returned `404`.
+- Polling showed the API switched to the new version when unauthenticated `/api/releases` changed to `401 Authentication required`.
+- Live health still reported `ok: true`, Gemini ready, image ready.
+- Live web root returned `200`.
 
 ## Existing Worktrees
 
@@ -213,7 +229,7 @@ At one point these old worktrees existed:
 - `.worktrees/fashion-os-monorepo`
 - `.worktrees/fashion-os-ui`
 
-The Phase 2A and Phase 2B worktrees were removed after their branches were merged/pushed.
+The Phase 2A, Phase 2B, Phase 3A, Phase 3B, Phase 3C, and Phase 3G worktrees were removed after their branches were merged/pushed.
 
 Before starting new work, run:
 
@@ -222,10 +238,10 @@ git status --short --branch
 git worktree list
 ```
 
-For Phase 3A implementation, create a fresh worktree such as:
+For the next implementation phase, create a fresh worktree such as:
 
 ```bash
-git worktree add .worktrees/phase-3a-app-architecture -b codex/phase-3a-app-architecture
+git worktree add .worktrees/phase-3h-web-ops -b codex/phase-3h-web-ops
 ```
 
 ## Verification Already Passed
@@ -281,6 +297,31 @@ Live Phase 2B smoke checks:
 - Invalid `POST /api/auth/login`: `401 Authentication failed` after Render env was active.
 - Web app loads at `https://agorase-fashion-os-web.onrender.com`.
 
+For Phase 3G on merged `main`:
+
+```bash
+npm test
+npm run typecheck
+npm run build
+npm run lint
+rg 'ADMIN_PASSWORD|SESSION_SECRET|DATABASE_URL|GEMINI_API_KEY|GOOGLE_API_KEY|x-goog-api-key|AIza' apps/web/dist || true
+```
+
+Results:
+
+- `npm test`: 67 test files, 323 tests passed on merged `main`.
+- Typecheck passed.
+- Build passed.
+- Lint passed.
+- Web bundle secret scan had no output.
+- Browser smoke via Playwright fallback passed for Releases navigation, release editor, launch task creation, and partner linking.
+
+Live Phase 3G smoke checks:
+
+- `GET /api/health`: `{"ok":true,"providers":{"gemini":"ready","image":"ready"}}`
+- Unauthenticated `GET /api/releases`: `401 unauthorized`.
+- Web root returned `200`.
+
 ## Next Planned Work
 
 Execute Phase 3 from:
@@ -290,27 +331,22 @@ Execute Phase 3 from:
 
 Recommended next steps:
 
-1. Create a fresh isolated worktree for Phase 3A:
-   - `git worktree add .worktrees/phase-3a-app-architecture -b codex/phase-3a-app-architecture`
+1. Create a fresh isolated worktree for Phase 3H:
+   - `git worktree add .worktrees/phase-3h-web-ops -b codex/phase-3h-web-ops`
 2. Run baseline verification:
    - `npm test`
    - `npm run typecheck`
    - `npm run build`
    - `npm run lint`
 3. Write the child spec:
-   - `docs/superpowers/specs/2026-05-15-phase-3a-app-architecture-design.md`
+   - `docs/superpowers/specs/2026-05-15-phase-3h-web-ops-design.md`
 4. Write the child implementation plan:
-   - `docs/superpowers/plans/2026-05-15-phase-3a-app-architecture.md`
-5. Implement Phase 3A with TDD:
-   - split `apps/web/src/App.tsx`
-   - preserve current behavior
-   - keep auth gate and partner workflows working
-   - do not add new product features during this refactor
-6. Continue through completion master plan phases:
-   - Phase 3B operational data foundation
-   - Phase 3C production workspace
-   - Phase 3G releases
-   - Phase 3H web ops
+   - `docs/superpowers/plans/2026-05-15-phase-3h-web-ops.md`
+5. Implement Phase 3H with TDD:
+   - add persistent web ops records, page/copy briefs, SEO notes, and publishing checklist state
+   - build a Web Ops workspace and link items to releases where useful
+   - keep protected API routes and `credentials: include`
+6. Continue through remaining completion phases:
    - Phase 3D creative lab
    - Phase 3E mockups
    - Phase 3F legal orientation
