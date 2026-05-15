@@ -11,6 +11,7 @@ import { createPostgresReleaseTasksRepository } from './db/releaseTasksRepositor
 import { createPostgresReleasesRepository } from './db/releasesRepository.js'
 import { createPostgresSampleRequestsRepository } from './db/sampleRequestsRepository.js'
 import { createPostgresTasksRepository } from './db/tasksRepository.js'
+import { createPostgresWebOpsItemsRepository } from './db/webOpsItemsRepository.js'
 import { errorResponse, jsonResponse, resolveOrigin } from './http.js'
 import { healthRoute } from './routes/health.js'
 import { authRoute } from './routes/auth.js'
@@ -28,6 +29,7 @@ import {
 import { researchRoute } from './routes/research.js'
 import { tasksRoute, type TasksRepository } from './routes/tasks.js'
 import { visualizeRoute } from './routes/visualize.js'
+import { webOpsRoute, type WebOpsItemsRepository } from './routes/webOps.js'
 
 export interface ApiContext {
   env: ApiEnv
@@ -40,6 +42,7 @@ export interface ApiContext {
   releasesRepository?: ReleasesRepository
   releaseTasksRepository?: ReleaseTasksRepository
   releasePartnersRepository?: ReleasePartnersRepository
+  webOpsItemsRepository?: WebOpsItemsRepository
 }
 
 export async function handleRequest(request: Request, contextOrEnv: ApiEnv | ApiContext = readEnv()) {
@@ -97,6 +100,12 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
       releasePartnersRepository: context.releasePartnersRepository,
     })
   }
+  if (pathname === '/api/web-ops' || pathname.startsWith('/api/web-ops/')) {
+    if (!context.webOpsItemsRepository) {
+      return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    }
+    return webOpsRoute(request, env, context.webOpsItemsRepository)
+  }
 
   return errorResponse('not_found', 'Route not found', 404, origin)
 }
@@ -121,6 +130,8 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith('/api/production/samples/') ||
     pathname === '/api/releases' ||
     pathname.startsWith('/api/releases/') ||
+    pathname === '/api/web-ops' ||
+    pathname.startsWith('/api/web-ops/') ||
     pathname === '/api/research/partners' ||
     pathname === '/api/visualize' ||
     pathname === '/api/mockups/generate'
@@ -143,6 +154,7 @@ if (process.env.NODE_ENV !== 'test') {
     releasesRepository: pool ? createPostgresReleasesRepository(pool) : undefined,
     releaseTasksRepository: pool ? createPostgresReleaseTasksRepository(pool) : undefined,
     releasePartnersRepository: pool ? createPostgresReleasePartnersRepository(pool) : undefined,
+    webOpsItemsRepository: pool ? createPostgresWebOpsItemsRepository(pool) : undefined,
   }
   const server = await import('node:http')
   server

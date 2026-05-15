@@ -15,6 +15,7 @@ import { importPartners, listPartners, savePartner, updatePartner } from './api/
 import { listProductionProfiles } from './api/productionApi'
 import { listReleaseTasks } from './api/releasesApi'
 import { listTasks, saveTask } from './api/tasksApi'
+import { listWebOpsItems } from './api/webOpsApi'
 import { CommandCenter } from './sections/command/CommandCenter'
 import { WorkspaceFoundation } from './sections/foundation/WorkspaceFoundation'
 import { PartnersView } from './sections/partners/PartnersView'
@@ -23,7 +24,9 @@ import { ReleasesView } from './sections/releases/ReleasesView'
 import { createReleaseLaunchTasks } from './sections/releases/releaseTasks'
 import { SettingsView } from './sections/settings/SettingsView'
 import { SourcingView } from './sections/sourcing/SourcingView'
-import type { OperationalTask, ProductionProfile, ReleaseTask } from '@agorase/shared'
+import { WebOpsView } from './sections/webOps/WebOpsView'
+import { createWebOpsCommandTasks } from './sections/webOps/webOpsTasks'
+import type { OperationalTask, ProductionProfile, ReleaseTask, WebOpsItem } from '@agorase/shared'
 import type { Category, CrmTask, Manufactory, PipelineStatus } from './types'
 
 type Section = FashionOsModule['section']
@@ -39,6 +42,7 @@ function App() {
   const [persistedTasks, setPersistedTasks] = useState<OperationalTask[]>([])
   const [productionProfiles, setProductionProfiles] = useState<ProductionProfile[]>([])
   const [releaseTasks, setReleaseTasks] = useState<ReleaseTask[]>([])
+  const [webOpsItems, setWebOpsItems] = useState<WebOpsItem[]>([])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'Alle' | Category>('Alle')
@@ -80,6 +84,7 @@ function App() {
     }))
     .concat(createProductionBlockerTasks(productionProfiles, records, persistedTasksById))
     .concat(createReleaseLaunchTasks(releaseTasks, persistedTasksById, today))
+    .concat(createWebOpsCommandTasks(webOpsItems, persistedTasksById, today))
   const openTaskCount = tasks.filter((task) => !task.completed).length
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
 
@@ -97,15 +102,17 @@ function App() {
         setRecordsStatus('ready')
         setRecordsError('')
         try {
-          const [loadedTasks, loadedProfiles, loadedReleaseTasks] = await Promise.all([
+          const [loadedTasks, loadedProfiles, loadedReleaseTasks, loadedWebOpsItems] = await Promise.all([
             listTasks(),
             listProductionProfiles(),
             listReleaseTasks(),
+            listWebOpsItems(),
           ])
           if (active) {
             setPersistedTasks(loadedTasks)
             setProductionProfiles(loadedProfiles)
             setReleaseTasks(loadedReleaseTasks)
+            setWebOpsItems(loadedWebOpsItems)
           }
         } catch (caught) {
           if (!active) return
@@ -245,7 +252,7 @@ function App() {
         {activeSection === 'Mockups' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Legal Orientation' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Releases' && <ReleasesView module={activeModule} records={filteredRecords} />}
-        {activeSection === 'Web Ops' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Web Ops' && <WebOpsView module={activeModule} />}
         {activeSection === 'Settings' && (
           <SettingsView
             status={

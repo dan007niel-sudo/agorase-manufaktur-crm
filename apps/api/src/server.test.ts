@@ -9,6 +9,7 @@ import type {
   ReleasePartnerLink,
   ReleaseTask,
   SampleRequest,
+  WebOpsItem,
 } from '@agorase/shared'
 import { readEnv } from './env.js'
 import { buildSessionCookie } from './auth/session.js'
@@ -143,6 +144,26 @@ describe('API server', () => {
     createdAt: '2026-05-15T00:00:00.000Z',
   }
 
+  const testWebOpsItem: WebOpsItem = {
+    id: 'web-ops-1',
+    releaseId: 'drop-1',
+    title: 'Launch landing page',
+    kind: 'page-brief',
+    status: 'in-progress',
+    summary: 'Hero, story, CTA.',
+    body: 'Long brief body.',
+    targetUrl: '/drop-1',
+    seoTitle: 'Drop 1 — Agorase',
+    seoDescription: 'First capsule.',
+    seoKeywords: 'agorase, drop 1',
+    checklist: [{ id: 'c1', label: 'Hero copy', done: true }],
+    assignee: 'Daniel',
+    dueDate: '2026-06-15',
+    notes: '',
+    createdAt: '2026-05-15T00:00:00.000Z',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  }
+
   function fakePartnersRepository(partners: Manufactory[] = []) {
     return {
       list: vi.fn(async () => partners),
@@ -215,6 +236,15 @@ describe('API server', () => {
     return {
       list: vi.fn(async () => links),
       upsert: vi.fn(async (link: ReleasePartnerLink) => link),
+      delete: vi.fn(async () => undefined),
+    }
+  }
+
+  function fakeWebOpsItemsRepository(items: WebOpsItem[] = [testWebOpsItem]) {
+    return {
+      list: vi.fn(async () => items),
+      get: vi.fn(async (id: string) => items.find((item) => item.id === id) ?? null),
+      upsert: vi.fn(async (item: WebOpsItem) => item),
       delete: vi.fn(async () => undefined),
     }
   }
@@ -754,5 +784,120 @@ describe('API server', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ links: [testReleasePartnerLink] })
     expect(releasePartnersRepository.list).toHaveBeenCalledWith('drop-1')
+  })
+
+  it('rejects unauthenticated web ops requests', async () => {
+    const response = await handleRequest(new Request('http://localhost/api/web-ops'), {
+      env: authenticatedEnv(),
+      webOpsItemsRepository: fakeWebOpsItemsRepository(),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('routes authenticated web ops list requests with filters', async () => {
+    const env = authenticatedEnv()
+    const webOpsItemsRepository = fakeWebOpsItemsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/web-ops?release=drop-1&kind=page-brief&status=ready', {
+        headers: authenticatedHeaders(env),
+      }),
+      { env, webOpsItemsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ items: [testWebOpsItem] })
+    expect(webOpsItemsRepository.list).toHaveBeenCalledWith({
+      releaseId: 'drop-1',
+      kind: 'page-brief',
+      status: 'ready',
+    })
+  })
+
+  it('creates web ops items through the repository', async () => {
+    const env = authenticatedEnv()
+    const webOpsItemsRepository = fakeWebOpsItemsRepository([])
+    const response = await handleRequest(
+      new Request('http://localhost/api/web-ops', {
+        method: 'POST',
+        headers: authenticatedHeaders(env),
+        body: JSON.stringify(testWebOpsItem),
+      }),
+      { env, webOpsItemsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ item: testWebOpsItem })
+    expect(webOpsItemsRepository.upsert).toHaveBeenCalledWith(testWebOpsItem)
+  })
+
+  it('returns 404 when a web ops item is not found', async () => {
+    const env = authenticatedEnv()
+    const webOpsItemsRepository = fakeWebOpsItemsRepository([])
+    const response = await handleRequest(
+      new Request('http://localhost/api/web-ops/missing', { headers: authenticatedHeaders(env) }),
+      { env, webOpsItemsRepository },
+    )
+
+    expect(response.status).toBe(404)
+  })
+
+  it('gets a single web ops item', async () => {
+    const env = authenticatedEnv()
+    const webOpsItemsRepository = fakeWebOpsItemsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/web-ops/web-ops-1', { headers: authenticatedHeaders(env) }),
+      { env, webOpsItemsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ item: testWebOpsItem })
+  })
+
+  it('saves web ops items by id with PUT', async () => {
+    const env = authenticatedEnv()
+    const webOpsItemsRepository = fakeWebOpsItemsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/web-ops/web-ops-1', {
+        method: 'PUT',
+        headers: authenticatedHeaders(env),
+        body: JSON.stringify({ ...testWebOpsItem, id: 'ignored' }),
+      }),
+      { env, webOpsItemsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    expect(webOpsItemsRepository.upsert).toHaveBeenCalledWith({ ...testWebOpsItem, id: 'web-ops-1' })
+  })
+
+  it('patches web ops items by merging onto the existing record', async () => {
+    const env = authenticatedEnv()
+    const webOpsItemsRepository = fakeWebOpsItemsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/web-ops/web-ops-1', {
+        method: 'PATCH',
+        headers: authenticatedHeaders(env),
+        body: JSON.stringify({ status: 'ready' }),
+      }),
+      { env, webOpsItemsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    expect(webOpsItemsRepository.upsert).toHaveBeenCalledWith({ ...testWebOpsItem, status: 'ready' })
+  })
+
+  it('deletes web ops items by id', async () => {
+    const env = authenticatedEnv()
+    const webOpsItemsRepository = fakeWebOpsItemsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/web-ops/web-ops-1', {
+        method: 'DELETE',
+        headers: authenticatedHeaders(env),
+      }),
+      { env, webOpsItemsRepository },
+    )
+
+    expect(response.status).toBe(204)
+    expect(webOpsItemsRepository.delete).toHaveBeenCalledWith('web-ops-1')
   })
 })

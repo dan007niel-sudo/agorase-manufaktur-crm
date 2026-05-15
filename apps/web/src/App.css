@@ -460,9 +460,88 @@ label {
   gap: 16px;
 }
 
-.releases-layout {
+.releases-layout,
+.web-ops-layout {
   grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
   align-items: start;
+}
+
+.web-ops-layout {
+  display: grid;
+  gap: 16px;
+}
+
+.web-ops-list,
+.web-ops-workspace {
+  display: grid;
+  gap: 12px;
+}
+
+.web-ops-filters {
+  display: grid;
+  gap: 8px;
+}
+
+.web-ops-card {
+  display: grid;
+  gap: 5px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fffdf8;
+  padding: 11px;
+}
+
+.web-ops-card.selected {
+  border-color: var(--ink);
+  background: #f4efe4;
+}
+
+.web-ops-card span,
+.web-ops-card small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.web-ops-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.web-ops-summary > div,
+.web-ops-panel {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffdf8;
+  padding: 12px;
+}
+
+.web-ops-summary strong {
+  display: block;
+  margin-top: 4px;
+}
+
+.web-ops-detail-grid,
+.web-ops-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.web-ops-panel h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.web-ops-panel textarea {
+  min-height: 72px;
+}
+
+.web-ops-checklist-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .production-workspace {
@@ -945,6 +1024,8 @@ label {
   .view-grid,
   .ai-research-layout,
   .releases-layout,
+  .web-ops-layout,
+  .web-ops-summary,
   .production-summary,
   .release-summary,
   .release-partner-form,

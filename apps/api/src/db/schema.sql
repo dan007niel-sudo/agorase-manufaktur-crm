@@ -147,3 +147,27 @@ create table if not exists release_partners (
 
 create index if not exists release_partners_release_id_idx on release_partners (release_id);
 create index if not exists release_partners_partner_id_idx on release_partners (partner_id);
+
+create table if not exists web_ops_items (
+  id text primary key,
+  release_id text not null default '',
+  title text not null,
+  kind text not null,
+  status text not null,
+  summary text not null default '',
+  body text not null default '',
+  target_url text not null default '',
+  seo_title text not null default '',
+  seo_description text not null default '',
+  seo_keywords text not null default '',
+  checklist jsonb not null default '[]'::jsonb,
+  assignee text not null default '',
+  due_date text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists web_ops_items_release_id_idx on web_ops_items (release_id);
+create index if not exists web_ops_items_status_idx on web_ops_items (status);
+create index if not exists web_ops_items_kind_idx on web_ops_items (kind);
