@@ -10,7 +10,7 @@ describe('partnersApi', () => {
 
     await expect(listPartners()).resolves.toEqual([])
 
-    expect(fetch).toHaveBeenCalledWith('/api/partners', expect.any(Object))
+    expect(fetch).toHaveBeenCalledWith('/api/partners', expect.objectContaining({ credentials: 'include' }))
   })
 
   it('saves one partner through the API', async () => {
@@ -21,7 +21,7 @@ describe('partnersApi', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       '/api/partners',
-      expect.objectContaining({ method: 'POST', body: JSON.stringify(partner) }),
+      expect.objectContaining({ method: 'POST', credentials: 'include', body: JSON.stringify(partner) }),
     )
   })
 
@@ -33,7 +33,7 @@ describe('partnersApi', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       `/api/partners/${partner.id}`,
-      expect.objectContaining({ method: 'PUT', body: JSON.stringify({ status: 'Antwort erhalten' }) }),
+      expect.objectContaining({ method: 'PUT', credentials: 'include', body: JSON.stringify({ status: 'Antwort erhalten' }) }),
     )
   })
 
@@ -42,7 +42,10 @@ describe('partnersApi', () => {
 
     await expect(importPartners([])).resolves.toEqual([])
 
-    expect(fetch).toHaveBeenCalledWith('/api/partners/import', expect.objectContaining({ method: 'POST' }))
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/partners/import',
+      expect.objectContaining({ method: 'POST', credentials: 'include' }),
+    )
   })
 
   it('throws readable errors for failed responses', async () => {

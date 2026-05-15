@@ -136,6 +136,7 @@ export async function requestAiManufactories({
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
   const response = await fetch(`${apiBaseUrl}/api/research/partners/`, {
     method: 'POST',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     },

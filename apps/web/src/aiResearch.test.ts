@@ -118,7 +118,7 @@ describe('requestAiManufactories', () => {
       },
     })
 
-    expect(fetchSpy).toHaveBeenCalledWith('/api/research/partners/', expect.any(Object))
+    expect(fetchSpy).toHaveBeenCalledWith('/api/research/partners/', expect.objectContaining({ credentials: 'include' }))
   })
 })
 
