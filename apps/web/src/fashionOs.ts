@@ -49,7 +49,7 @@ export const fashionOsModules: FashionOsModule[] = [
     label: 'Mockups',
     shortLabel: 'Mockups',
     summary: 'Server-routed image generation workspace for garment and campaign visuals.',
-    status: 'planned',
+    status: 'active',
   },
   {
     section: 'Legal Orientation',

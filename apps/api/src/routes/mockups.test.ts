@@ -1,0 +1,420 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { MockupJob } from '@agorase/shared'
+import { readEnv } from '../env.js'
+import { buildSessionCookie } from '../auth/session.js'
+import { handleRequest } from '../index.js'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+const sampleJob: MockupJob = {
+  id: 'mockup-1',
+  prompt: 'A poetic SS27 capsule mockup.',
+  referenceNotes: '',
+  aspectRatio: '4:5',
+  quality: 'standard',
+  status: 'completed',
+  modelUsed: 'gemini-3-pro-image-preview',
+  imageUrl: 'https://example.test/img.png',
+  imageData: '',
+  mimeType: 'image/png',
+  error: '',
+  releaseId: 'drop-1',
+  briefId: 'brief-1',
+  notes: '',
+  createdAt: '2026-05-15T00:00:00.000Z',
+  updatedAt: '2026-05-15T00:00:00.000Z',
+}
+
+function authenticatedEnv(source: Record<string, string | undefined> = {}) {
+  return readEnv({ ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'secret', ...source })
+}
+
+function authenticatedHeaders(env = authenticatedEnv()) {
+  return { cookie: buildSessionCookie(env) }
+}
+
+function fakeRepository(jobs: MockupJob[] = [sampleJob]) {
+  const upserted: MockupJob[] = []
+  return {
+    upserted,
+    list: vi.fn(async () => jobs),
+    get: vi.fn(async (id: string) => jobs.find((job) => job.id === id) ?? null),
+    upsert: vi.fn(async (job: MockupJob) => {
+      upserted.push(job)
+      return job
+    }),
+    delete: vi.fn(async () => undefined),
+  }
+}
+
+function fullContext(envSource: Record<string, string | undefined> = {}) {
+  return {
+    env: authenticatedEnv(envSource),
+    mockupJobsRepository: fakeRepository(),
+  }
+}
+
+describe('mockups routes', () => {
+  it('rejects unauthenticated list requests', async () => {
+    const response = await handleRequest(new Request('http://localhost/api/mockups'), fullContext())
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects unauthenticated detail requests', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/mockup-1'),
+      fullContext(),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects unauthenticated delete requests', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/mockup-1', { method: 'DELETE' }),
+      fullContext(),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects unauthenticated generate requests', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        body: JSON.stringify({ prompt: 'test' }),
+      }),
+      fullContext(),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('lists jobs with status, brief, and release filters', async () => {
+    const context = fullContext()
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups?status=completed&brief=brief-1&release=drop-1', {
+        headers: authenticatedHeaders(context.env),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ jobs: [sampleJob] })
+    expect(context.mockupJobsRepository.list).toHaveBeenCalledWith({
+      status: 'completed',
+      briefId: 'brief-1',
+      releaseId: 'drop-1',
+    })
+  })
+
+  it('gets a job by id', async () => {
+    const context = fullContext()
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/mockup-1', {
+        headers: authenticatedHeaders(context.env),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ job: sampleJob })
+  })
+
+  it('returns 404 for unknown jobs', async () => {
+    const context = fullContext()
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/missing', {
+        headers: authenticatedHeaders(context.env),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(404)
+  })
+
+  it('deletes a job by id', async () => {
+    const context = fullContext()
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/mockup-1', {
+        method: 'DELETE',
+        headers: authenticatedHeaders(context.env),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(204)
+    expect(context.mockupJobsRepository.delete).toHaveBeenCalledWith('mockup-1')
+  })
+
+  it('rejects generate requests without a prompt', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-key' })
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ prompt: '   ' }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: { code: 'invalid_mockup_request' },
+    })
+  })
+
+  it('returns 503 mockups_not_configured when GEMINI_API_KEY is missing', async () => {
+    const context = fullContext()
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ prompt: 'capsule SS27' }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(503)
+    const body = await response.text()
+    expect(body).toContain('mockups_not_configured')
+    expect(body).not.toContain('GEMINI_API_KEY')
+    expect(body).not.toContain('x-goog-api-key')
+  })
+
+  it('completes a generate from inline base64 image data without leaking secrets', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const aiPayload = JSON.stringify({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                inlineData: {
+                  data: 'aGVsbG8=',
+                  mimeType: 'image/png',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(aiPayload, { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({
+          prompt: 'capsule SS27',
+          aspect_ratio: '4:5',
+          quality: 'standard',
+          brief_id: 'brief-1',
+          release_id: 'drop-1',
+        }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { job: MockupJob }
+    expect(body.job).toMatchObject({
+      status: 'completed',
+      imageData: 'aGVsbG8=',
+      mimeType: 'image/png',
+      aspectRatio: '4:5',
+      quality: 'standard',
+      briefId: 'brief-1',
+      releaseId: 'drop-1',
+      error: '',
+    })
+    expect(body.job.modelUsed).toBe(context.env.geminiImageModel)
+
+    const stringified = JSON.stringify(body)
+    expect(stringified).not.toContain('test-secret')
+    expect(stringified).not.toContain('x-goog-api-key')
+    expect(stringified).not.toContain('GEMINI_API_KEY')
+    expect(stringified).not.toContain('AIza')
+    expect(stringified).not.toContain('googleapis.com')
+
+    const [url, init] = fetchSpy.mock.calls[0]
+    expect(String(url)).not.toContain('test-secret')
+    expect((init?.headers as Record<string, string>)['x-goog-api-key']).toBe('test-secret')
+  })
+
+  it('completes a generate from a returned file URI', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const aiPayload = JSON.stringify({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                fileData: {
+                  fileUri: 'https://example.test/generated.png',
+                  mimeType: 'image/png',
+                },
+              },
+            ],
+          },
+        },
+      ],
+    })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(aiPayload, { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ prompt: 'capsule SS27' }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { job: MockupJob }
+    expect(body.job).toMatchObject({
+      status: 'completed',
+      imageUrl: 'https://example.test/generated.png',
+      imageData: '',
+      mimeType: 'image/png',
+    })
+  })
+
+  it('marks the job failed and sanitizes the error when the provider returns 500', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { message: 'raw upstream secret: AIzaFAKE / endpoint googleapis.com' } }),
+        { status: 500, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ prompt: 'capsule SS27' }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { job: MockupJob }
+    expect(body.job.status).toBe('failed')
+    expect(body.job.error).not.toContain('AIzaFAKE')
+    expect(body.job.error).not.toContain('googleapis.com')
+
+    const text = JSON.stringify(body)
+    expect(text).not.toContain('AIzaFAKE')
+    expect(text).not.toContain('googleapis.com')
+    expect(text).not.toContain('test-secret')
+    expect(text).not.toContain('x-goog-api-key')
+
+    // Verify the job was first persisted as pending and then updated to failed.
+    const upserts = context.mockupJobsRepository.upserted
+    expect(upserts).toHaveLength(2)
+    expect(upserts[0]?.status).toBe('pending')
+    expect(upserts[1]?.status).toBe('failed')
+  })
+
+  it('marks the job failed when the provider returns no image data and no URL', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ candidates: [{ content: { parts: [] } }] }), { status: 200 }),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ prompt: 'capsule SS27' }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { job: MockupJob }
+    expect(body.job.status).toBe('failed')
+    expect(body.job.error).toBe('Image provider returned no image data.')
+
+    const text = JSON.stringify(body)
+    expect(text).not.toContain('googleapis.com')
+    expect(text).not.toContain('test-secret')
+  })
+
+  it('drops oversized base64 payloads but keeps a returned URL', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const big = 'A'.repeat(4 * 1024 * 1024 + 16)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  { inlineData: { data: big, mimeType: 'image/png' } },
+                  { fileData: { fileUri: 'https://example.test/big.png', mimeType: 'image/png' } },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ prompt: 'capsule SS27' }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { job: MockupJob }
+    expect(body.job.status).toBe('completed')
+    expect(body.job.imageData).toBe('')
+    expect(body.job.imageUrl).toBe('https://example.test/big.png')
+  })
+
+  it('marks the job failed when only base64 is returned and exceeds the 4MB limit', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const big = 'A'.repeat(4 * 1024 * 1024 + 16)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [{ inlineData: { data: big, mimeType: 'image/png' } }],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ prompt: 'capsule SS27' }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { job: MockupJob }
+    expect(body.job.status).toBe('failed')
+    expect(body.job.imageData).toBe('')
+    expect(body.job.error).toContain('4 MB')
+  })
+})

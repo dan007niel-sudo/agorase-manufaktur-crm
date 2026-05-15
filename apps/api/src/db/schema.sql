@@ -220,3 +220,26 @@ create table if not exists prompt_templates (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create table if not exists mockup_jobs (
+  id text primary key,
+  prompt text not null,
+  reference_notes text not null default '',
+  aspect_ratio text not null default '1:1',
+  quality text not null default 'standard',
+  status text not null,
+  model_used text not null default '',
+  image_url text not null default '',
+  image_data text not null default '',
+  mime_type text not null default '',
+  error text not null default '',
+  release_id text not null default '',
+  brief_id text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists mockup_jobs_status_idx on mockup_jobs (status);
+create index if not exists mockup_jobs_brief_id_idx on mockup_jobs (brief_id);
+create index if not exists mockup_jobs_release_id_idx on mockup_jobs (release_id);

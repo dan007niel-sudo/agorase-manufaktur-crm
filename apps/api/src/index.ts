@@ -4,6 +4,7 @@ import { createDbPool } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
 import { createPostgresCreativeBriefsRepository } from './db/creativeBriefsRepository.js'
 import { createPostgresCreativeDirectionsRepository } from './db/creativeDirectionsRepository.js'
+import { createPostgresMockupJobsRepository } from './db/mockupJobsRepository.js'
 import { createPostgresPartnerEvaluationsRepository } from './db/partnerEvaluationsRepository.js'
 import { createPostgresPartnerEventsRepository } from './db/partnerEventsRepository.js'
 import { createPostgresPartnersRepository } from './db/partnersRepository.js'
@@ -24,7 +25,7 @@ import {
   type CreativeDirectionsRepository,
   type PromptTemplatesRepository,
 } from './routes/creative.js'
-import { mockupsRoute } from './routes/mockups.js'
+import { mockupsRoute, type MockupJobsRepository } from './routes/mockups.js'
 import { partnerEvaluationsRoute, type PartnerEvaluationsRepository } from './routes/partnerEvaluations.js'
 import { partnerEventsRoute, type PartnerEventsRepository } from './routes/partnerEvents.js'
 import { partnersRoute, type PartnersRepository } from './routes/partners.js'
@@ -54,6 +55,7 @@ export interface ApiContext {
   creativeBriefsRepository?: CreativeBriefsRepository
   creativeDirectionsRepository?: CreativeDirectionsRepository
   promptTemplatesRepository?: PromptTemplatesRepository
+  mockupJobsRepository?: MockupJobsRepository
 }
 
 export async function handleRequest(request: Request, contextOrEnv: ApiEnv | ApiContext = readEnv()) {
@@ -72,7 +74,12 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
     return errorResponse('unauthorized', 'Authentication required.', 401, origin)
   }
   if (pathname === '/api/research/partners' && request.method === 'POST') return researchRoute(request, env)
-  if (pathname === '/api/mockups/generate' && request.method === 'POST') return mockupsRoute(request, env)
+  if (pathname === '/api/mockups' || pathname.startsWith('/api/mockups/')) {
+    if (!context.mockupJobsRepository) {
+      return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    }
+    return mockupsRoute(request, env, context.mockupJobsRepository)
+  }
   if (pathname === '/api/creative' || pathname.startsWith('/api/creative/')) {
     if (!context.creativeBriefsRepository || !context.creativeDirectionsRepository || !context.promptTemplatesRepository) {
       return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
@@ -155,7 +162,8 @@ function isProtectedPath(pathname: string) {
     pathname === '/api/creative' ||
     pathname.startsWith('/api/creative/') ||
     pathname === '/api/research/partners' ||
-    pathname === '/api/mockups/generate'
+    pathname === '/api/mockups' ||
+    pathname.startsWith('/api/mockups/')
   )
 }
 
@@ -179,6 +187,7 @@ if (process.env.NODE_ENV !== 'test') {
     creativeBriefsRepository: pool ? createPostgresCreativeBriefsRepository(pool) : undefined,
     creativeDirectionsRepository: pool ? createPostgresCreativeDirectionsRepository(pool) : undefined,
     promptTemplatesRepository: pool ? createPostgresPromptTemplatesRepository(pool) : undefined,
+    mockupJobsRepository: pool ? createPostgresMockupJobsRepository(pool) : undefined,
   }
   const server = await import('node:http')
   server

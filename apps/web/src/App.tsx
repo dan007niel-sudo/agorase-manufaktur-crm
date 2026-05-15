@@ -12,6 +12,7 @@ import { seedManufactories } from './data'
 import { calculateMetrics, createEmptyManufacture, deriveTasks, upsertManufacture } from './crmUtils'
 import { fashionOsModules, type FashionOsModule } from './fashionOs'
 import { listCreativeBriefs, listCreativeDirections } from './api/creativeApi'
+import { listMockupJobs } from './api/mockupsApi'
 import { importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
 import { listProductionProfiles } from './api/productionApi'
 import { listReleases, listReleaseTasks } from './api/releasesApi'
@@ -21,6 +22,8 @@ import { CommandCenter } from './sections/command/CommandCenter'
 import { CreativeLabView } from './sections/creativeLab/CreativeLabView'
 import { createCreativeCommandTasks } from './sections/creativeLab/creativeTasks'
 import { WorkspaceFoundation } from './sections/foundation/WorkspaceFoundation'
+import { MockupsView } from './sections/mockups/MockupsView'
+import { createMockupCommandTasks } from './sections/mockups/mockupTasks'
 import { PartnersView } from './sections/partners/PartnersView'
 import { ProductionView } from './sections/production/ProductionView'
 import { ReleasesView } from './sections/releases/ReleasesView'
@@ -33,6 +36,7 @@ import type {
   CreativeBrief,
   CreativeDirection,
   FashionRelease,
+  MockupJob,
   OperationalTask,
   ProductionProfile,
   ReleaseTask,
@@ -57,6 +61,7 @@ function App() {
   const [webOpsItems, setWebOpsItems] = useState<WebOpsItem[]>([])
   const [creativeBriefs, setCreativeBriefs] = useState<CreativeBrief[]>([])
   const [creativeDirections, setCreativeDirections] = useState<CreativeDirection[]>([])
+  const [mockupJobs, setMockupJobs] = useState<MockupJob[]>([])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'Alle' | Category>('Alle')
@@ -108,6 +113,13 @@ function App() {
         today,
       }),
     )
+    .concat(
+      createMockupCommandTasks({
+        jobs: mockupJobs,
+        persistedTasksById,
+        now: new Date().toISOString(),
+      }),
+    )
   const openTaskCount = tasks.filter((task) => !task.completed).length
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
 
@@ -133,6 +145,7 @@ function App() {
             loadedWebOpsItems,
             loadedCreativeBriefs,
             loadedCreativeDirections,
+            loadedMockupJobs,
           ] = await Promise.all([
             listTasks(),
             listProductionProfiles(),
@@ -141,6 +154,7 @@ function App() {
             listWebOpsItems(),
             listCreativeBriefs(),
             listCreativeDirections(),
+            listMockupJobs(),
           ])
           if (active) {
             setPersistedTasks(loadedTasks)
@@ -150,6 +164,7 @@ function App() {
             setWebOpsItems(loadedWebOpsItems)
             setCreativeBriefs(loadedCreativeBriefs)
             setCreativeDirections(loadedCreativeDirections)
+            setMockupJobs(loadedMockupJobs)
           }
         } catch (caught) {
           if (!active) return
@@ -286,7 +301,7 @@ function App() {
           <ProductionView module={activeModule} records={filteredRecords} onSelect={setSelectedId} onPatch={saveRecord} />
         )}
         {activeSection === 'Creative Lab' && <CreativeLabView module={activeModule} />}
-        {activeSection === 'Mockups' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Mockups' && <MockupsView module={activeModule} />}
         {activeSection === 'Legal Orientation' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Releases' && <ReleasesView module={activeModule} records={filteredRecords} />}
         {activeSection === 'Web Ops' && <WebOpsView module={activeModule} />}

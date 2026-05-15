@@ -18,7 +18,7 @@ describe('fashionOsModules', () => {
   })
 
   it('marks visible foundation modules without pretending everything is complete', () => {
-    expect(fashionOsModules.find((module) => module.section === 'Mockups')?.status).toBe('planned')
+    expect(fashionOsModules.find((module) => module.section === 'Mockups')?.status).toBe('active')
     expect(fashionOsModules.find((module) => module.section === 'Sourcing')?.status).toBe('active')
   })
 })

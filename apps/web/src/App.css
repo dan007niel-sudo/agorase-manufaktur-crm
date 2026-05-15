@@ -1182,3 +1182,12 @@ label {
     grid-template-columns: 1fr;
   }
 }
+
+.mockup-preview {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+  background: #fffdf8;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
