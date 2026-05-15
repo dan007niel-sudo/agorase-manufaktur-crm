@@ -1,5 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Manufactory, OperationalTask, PartnerEvaluation, PartnerEvent, ProductionProfile, SampleRequest } from '@agorase/shared'
+import type {
+  Manufactory,
+  OperationalTask,
+  PartnerEvaluation,
+  PartnerEvent,
+  ProductionProfile,
+  FashionRelease,
+  ReleasePartnerLink,
+  ReleaseTask,
+  SampleRequest,
+} from '@agorase/shared'
 import { readEnv } from './env.js'
 import { buildSessionCookie } from './auth/session.js'
 import { handleRequest } from './index.js'
@@ -101,6 +111,38 @@ describe('API server', () => {
     updatedAt: '2026-05-15T00:00:00.000Z',
   }
 
+  const testRelease: FashionRelease = {
+    id: 'drop-1',
+    name: 'Drop 1',
+    season: 'SS27',
+    launchDate: '2026-07-01',
+    status: 'planning',
+    summary: 'First capsule.',
+    contentStatus: 'drafting',
+    readinessNotes: 'Need samples.',
+    createdAt: '2026-05-15T00:00:00.000Z',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  }
+
+  const testReleaseTask: ReleaseTask = {
+    id: 'release-task-1',
+    releaseId: 'drop-1',
+    title: 'Finalize line sheet',
+    status: 'open',
+    owner: 'Daniel',
+    dueDate: '2026-06-01',
+    notes: '',
+    createdAt: '2026-05-15T00:00:00.000Z',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  }
+
+  const testReleasePartnerLink: ReleasePartnerLink = {
+    releaseId: 'drop-1',
+    partnerId: 'atelier-forma',
+    role: 'Production',
+    createdAt: '2026-05-15T00:00:00.000Z',
+  }
+
   function fakePartnersRepository(partners: Manufactory[] = []) {
     return {
       list: vi.fn(async () => partners),
@@ -149,6 +191,30 @@ describe('API server', () => {
     return {
       list: vi.fn(async () => samples),
       upsert: vi.fn(async (sample: SampleRequest) => sample),
+      delete: vi.fn(async () => undefined),
+    }
+  }
+
+  function fakeReleasesRepository(releases: FashionRelease[] = [testRelease]) {
+    return {
+      list: vi.fn(async () => releases),
+      upsert: vi.fn(async (release: FashionRelease) => release),
+      delete: vi.fn(async () => undefined),
+    }
+  }
+
+  function fakeReleaseTasksRepository(tasks: ReleaseTask[] = [testReleaseTask]) {
+    return {
+      list: vi.fn(async () => tasks),
+      upsert: vi.fn(async (task: ReleaseTask) => task),
+      delete: vi.fn(async () => undefined),
+    }
+  }
+
+  function fakeReleasePartnersRepository(links: ReleasePartnerLink[] = [testReleasePartnerLink]) {
+    return {
+      list: vi.fn(async () => links),
+      upsert: vi.fn(async (link: ReleasePartnerLink) => link),
       delete: vi.fn(async () => undefined),
     }
   }
@@ -605,5 +671,88 @@ describe('API server', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ samples: [testSample] })
     expect(sampleRequestsRepository.list).toHaveBeenCalledWith('atelier-forma')
+  })
+
+  it('rejects unauthenticated release requests', async () => {
+    const response = await handleRequest(new Request('http://localhost/api/releases'), {
+      env: authenticatedEnv(),
+      releasesRepository: fakeReleasesRepository(),
+      releaseTasksRepository: fakeReleaseTasksRepository(),
+      releasePartnersRepository: fakeReleasePartnersRepository(),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('routes authenticated release requests', async () => {
+    const env = authenticatedEnv()
+    const releasesRepository = fakeReleasesRepository()
+    const response = await handleRequest(new Request('http://localhost/api/releases', { headers: authenticatedHeaders(env) }), {
+      env,
+      releasesRepository,
+      releaseTasksRepository: fakeReleaseTasksRepository(),
+      releasePartnersRepository: fakeReleasePartnersRepository(),
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ releases: [testRelease] })
+    expect(releasesRepository.list).toHaveBeenCalled()
+  })
+
+  it('saves authenticated releases by id', async () => {
+    const env = authenticatedEnv()
+    const releasesRepository = fakeReleasesRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/releases/drop-1', {
+        method: 'PUT',
+        headers: authenticatedHeaders(env),
+        body: JSON.stringify({ ...testRelease, id: 'ignored' }),
+      }),
+      {
+        env,
+        releasesRepository,
+        releaseTasksRepository: fakeReleaseTasksRepository(),
+        releasePartnersRepository: fakeReleasePartnersRepository(),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(releasesRepository.upsert).toHaveBeenCalledWith({ ...testRelease, id: 'drop-1' })
+  })
+
+  it('routes authenticated release task requests with release filters', async () => {
+    const env = authenticatedEnv()
+    const releaseTasksRepository = fakeReleaseTasksRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/releases/tasks?releaseId=drop-1', { headers: authenticatedHeaders(env) }),
+      {
+        env,
+        releasesRepository: fakeReleasesRepository(),
+        releaseTasksRepository,
+        releasePartnersRepository: fakeReleasePartnersRepository(),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ tasks: [testReleaseTask] })
+    expect(releaseTasksRepository.list).toHaveBeenCalledWith('drop-1')
+  })
+
+  it('routes authenticated release partner requests with release filters', async () => {
+    const env = authenticatedEnv()
+    const releasePartnersRepository = fakeReleasePartnersRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/releases/partners?releaseId=drop-1', { headers: authenticatedHeaders(env) }),
+      {
+        env,
+        releasesRepository: fakeReleasesRepository(),
+        releaseTasksRepository: fakeReleaseTasksRepository(),
+        releasePartnersRepository,
+      },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ links: [testReleasePartnerLink] })
+    expect(releasePartnersRepository.list).toHaveBeenCalledWith('drop-1')
   })
 })

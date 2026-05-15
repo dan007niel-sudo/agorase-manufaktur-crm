@@ -105,3 +105,45 @@ create table if not exists sample_requests (
 
 create index if not exists sample_requests_partner_id_idx on sample_requests (partner_id);
 create index if not exists sample_requests_status_target_date_idx on sample_requests (status, target_date);
+
+create table if not exists releases (
+  id text primary key,
+  name text not null,
+  season text not null default '',
+  launch_date text not null default '',
+  status text not null,
+  summary text not null default '',
+  content_status text not null,
+  readiness_notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists releases_launch_date_idx on releases (launch_date asc);
+create index if not exists releases_status_idx on releases (status);
+
+create table if not exists release_tasks (
+  id text primary key,
+  release_id text not null,
+  title text not null,
+  status text not null,
+  owner text not null default '',
+  due_date text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists release_tasks_release_id_idx on release_tasks (release_id);
+create index if not exists release_tasks_status_due_date_idx on release_tasks (status, due_date);
+
+create table if not exists release_partners (
+  release_id text not null,
+  partner_id text not null,
+  role text not null default '',
+  created_at timestamptz not null default now(),
+  primary key (release_id, partner_id)
+);
+
+create index if not exists release_partners_release_id_idx on release_partners (release_id);
+create index if not exists release_partners_partner_id_idx on release_partners (partner_id);

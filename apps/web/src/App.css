@@ -454,9 +454,15 @@ label {
 }
 
 .production-layout,
+.releases-layout,
 .sourcing-layout {
   display: grid;
   gap: 16px;
+}
+
+.releases-layout {
+  grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
+  align-items: start;
 }
 
 .production-workspace {
@@ -464,56 +470,117 @@ label {
   gap: 14px;
 }
 
-.production-summary {
+.release-list,
+.release-workspace {
+  display: grid;
+  gap: 12px;
+}
+
+.production-summary,
+.release-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
 .production-summary > div,
-.production-card {
+.production-card,
+.release-summary > div,
+.release-panel {
   border: 1px solid var(--line);
   border-radius: 6px;
   background: #fffdf8;
   padding: 12px;
 }
 
-.production-summary strong {
+.production-summary strong,
+.release-summary strong {
   display: block;
   margin-top: 4px;
 }
 
 .production-detail-grid,
-.production-card {
+.production-card,
+.release-detail-grid,
+.release-panel {
   display: grid;
   gap: 12px;
 }
 
-.production-card h3 {
+.production-card h3,
+.release-panel h3 {
   margin: 0;
   font-size: 15px;
 }
 
-.production-card textarea {
+.production-card textarea,
+.release-panel textarea {
   min-height: 72px;
+}
+
+.release-card {
+  display: grid;
+  gap: 5px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fffdf8;
+  padding: 11px;
+}
+
+.release-card.selected {
+  border-color: var(--ink);
+  background: #f4efe4;
+}
+
+.release-card span,
+.release-card small,
+.release-partner-row span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .panel-header.compact {
   margin-bottom: 0;
 }
 
-.sample-row {
+.sample-row,
+.release-task-row {
   display: grid;
   grid-template-columns: minmax(150px, 1fr) 120px 132px 112px auto;
   gap: 8px;
   align-items: center;
 }
 
-.sample-row button {
+.release-task-row {
+  grid-template-columns: minmax(170px, 1fr) 96px 130px 132px;
+}
+
+.sample-row button,
+.release-partner-form button,
+.release-partner-row button {
   border: 1px solid var(--line);
   background: #fffdf8;
   border-radius: 4px;
   padding: 9px 10px;
+}
+
+.release-partner-form {
+  display: grid;
+  grid-template-columns: minmax(170px, 1fr) minmax(130px, 180px) auto;
+  gap: 8px;
+}
+
+.release-partner-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.release-partner-row div {
+  display: grid;
+  gap: 3px;
 }
 
 .pipeline-column {
@@ -877,7 +944,11 @@ label {
   .split-view,
   .view-grid,
   .ai-research-layout,
+  .releases-layout,
   .production-summary,
+  .release-summary,
+  .release-partner-form,
+  .release-task-row,
   .sample-row {
     grid-template-columns: 1fr;
   }
@@ -905,6 +976,7 @@ label {
   .metric-grid,
   .form-grid,
   .follow-row,
+  .release-partner-row,
   .task-row {
     grid-template-columns: 1fr;
   }

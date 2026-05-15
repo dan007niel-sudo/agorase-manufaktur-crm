@@ -6,6 +6,9 @@ import { createPostgresPartnerEvaluationsRepository } from './db/partnerEvaluati
 import { createPostgresPartnerEventsRepository } from './db/partnerEventsRepository.js'
 import { createPostgresPartnersRepository } from './db/partnersRepository.js'
 import { createPostgresProductionProfilesRepository } from './db/productionProfilesRepository.js'
+import { createPostgresReleasePartnersRepository } from './db/releasePartnersRepository.js'
+import { createPostgresReleaseTasksRepository } from './db/releaseTasksRepository.js'
+import { createPostgresReleasesRepository } from './db/releasesRepository.js'
 import { createPostgresSampleRequestsRepository } from './db/sampleRequestsRepository.js'
 import { createPostgresTasksRepository } from './db/tasksRepository.js'
 import { errorResponse, jsonResponse, resolveOrigin } from './http.js'
@@ -16,6 +19,12 @@ import { partnerEvaluationsRoute, type PartnerEvaluationsRepository } from './ro
 import { partnerEventsRoute, type PartnerEventsRepository } from './routes/partnerEvents.js'
 import { partnersRoute, type PartnersRepository } from './routes/partners.js'
 import { productionRoute, type ProductionProfilesRepository, type SampleRequestsRepository } from './routes/production.js'
+import {
+  releasesRoute,
+  type ReleasePartnersRepository,
+  type ReleaseTasksRepository,
+  type ReleasesRepository,
+} from './routes/releases.js'
 import { researchRoute } from './routes/research.js'
 import { tasksRoute, type TasksRepository } from './routes/tasks.js'
 import { visualizeRoute } from './routes/visualize.js'
@@ -28,6 +37,9 @@ export interface ApiContext {
   partnerEvaluationsRepository?: PartnerEvaluationsRepository
   productionProfilesRepository?: ProductionProfilesRepository
   sampleRequestsRepository?: SampleRequestsRepository
+  releasesRepository?: ReleasesRepository
+  releaseTasksRepository?: ReleaseTasksRepository
+  releasePartnersRepository?: ReleasePartnersRepository
 }
 
 export async function handleRequest(request: Request, contextOrEnv: ApiEnv | ApiContext = readEnv()) {
@@ -75,6 +87,16 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
       sampleRequestsRepository: context.sampleRequestsRepository,
     })
   }
+  if (pathname === '/api/releases' || pathname.startsWith('/api/releases/')) {
+    if (!context.releasesRepository || !context.releaseTasksRepository || !context.releasePartnersRepository) {
+      return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    }
+    return releasesRoute(request, env, {
+      releasesRepository: context.releasesRepository,
+      releaseTasksRepository: context.releaseTasksRepository,
+      releasePartnersRepository: context.releasePartnersRepository,
+    })
+  }
 
   return errorResponse('not_found', 'Route not found', 404, origin)
 }
@@ -97,6 +119,8 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith('/api/production/profiles/') ||
     pathname === '/api/production/samples' ||
     pathname.startsWith('/api/production/samples/') ||
+    pathname === '/api/releases' ||
+    pathname.startsWith('/api/releases/') ||
     pathname === '/api/research/partners' ||
     pathname === '/api/visualize' ||
     pathname === '/api/mockups/generate'
@@ -116,6 +140,9 @@ if (process.env.NODE_ENV !== 'test') {
     partnerEvaluationsRepository: pool ? createPostgresPartnerEvaluationsRepository(pool) : undefined,
     productionProfilesRepository: pool ? createPostgresProductionProfilesRepository(pool) : undefined,
     sampleRequestsRepository: pool ? createPostgresSampleRequestsRepository(pool) : undefined,
+    releasesRepository: pool ? createPostgresReleasesRepository(pool) : undefined,
+    releaseTasksRepository: pool ? createPostgresReleaseTasksRepository(pool) : undefined,
+    releasePartnersRepository: pool ? createPostgresReleasePartnersRepository(pool) : undefined,
   }
   const server = await import('node:http')
   server

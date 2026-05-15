@@ -13,14 +13,17 @@ import { calculateMetrics, createEmptyManufacture, deriveTasks, upsertManufactur
 import { fashionOsModules, type FashionOsModule } from './fashionOs'
 import { importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
 import { listProductionProfiles } from './api/productionApi'
+import { listReleaseTasks } from './api/releasesApi'
 import { listTasks, saveTask } from './api/tasksApi'
 import { CommandCenter } from './sections/command/CommandCenter'
 import { WorkspaceFoundation } from './sections/foundation/WorkspaceFoundation'
 import { PartnersView } from './sections/partners/PartnersView'
 import { ProductionView } from './sections/production/ProductionView'
+import { ReleasesView } from './sections/releases/ReleasesView'
+import { createReleaseLaunchTasks } from './sections/releases/releaseTasks'
 import { SettingsView } from './sections/settings/SettingsView'
 import { SourcingView } from './sections/sourcing/SourcingView'
-import type { OperationalTask, ProductionProfile } from '@agorase/shared'
+import type { OperationalTask, ProductionProfile, ReleaseTask } from '@agorase/shared'
 import type { Category, CrmTask, Manufactory, PipelineStatus } from './types'
 
 type Section = FashionOsModule['section']
@@ -35,6 +38,7 @@ function App() {
   const [recordsError, setRecordsError] = useState('')
   const [persistedTasks, setPersistedTasks] = useState<OperationalTask[]>([])
   const [productionProfiles, setProductionProfiles] = useState<ProductionProfile[]>([])
+  const [releaseTasks, setReleaseTasks] = useState<ReleaseTask[]>([])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'Alle' | Category>('Alle')
@@ -69,10 +73,14 @@ function App() {
   const today = '2026-05-14'
   const metrics = calculateMetrics(records, today)
   const persistedTasksById = useMemo(() => new Map(persistedTasks.map((task) => [task.id, task])), [persistedTasks])
-  const tasks = deriveTasks(records, today).map((task) => ({
-    ...task,
-    completed: persistedTasksById.get(task.id)?.status === 'done',
-  })).concat(createProductionBlockerTasks(productionProfiles, records, persistedTasksById))
+  const tasks = deriveTasks(records, today)
+    .map((task) => ({
+      ...task,
+      completed: persistedTasksById.get(task.id)?.status === 'done',
+    }))
+    .concat(createProductionBlockerTasks(productionProfiles, records, persistedTasksById))
+    .concat(createReleaseLaunchTasks(releaseTasks, persistedTasksById, today))
+  const openTaskCount = tasks.filter((task) => !task.completed).length
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
 
   useEffect(() => {
@@ -89,10 +97,16 @@ function App() {
         setRecordsStatus('ready')
         setRecordsError('')
         try {
-          const loadedTasks = await listTasks()
-          if (active) setPersistedTasks(loadedTasks)
-          const loadedProfiles = await listProductionProfiles()
-          if (active) setProductionProfiles(loadedProfiles)
+          const [loadedTasks, loadedProfiles, loadedReleaseTasks] = await Promise.all([
+            listTasks(),
+            listProductionProfiles(),
+            listReleaseTasks(),
+          ])
+          if (active) {
+            setPersistedTasks(loadedTasks)
+            setProductionProfiles(loadedProfiles)
+            setReleaseTasks(loadedReleaseTasks)
+          }
         } catch (caught) {
           if (!active) return
           setRecordsError(caught instanceof Error ? caught.message : 'Tasks konnten nicht geladen werden.')
@@ -188,7 +202,7 @@ function App() {
       <AppShell
         activeSection={activeSection}
         activeModule={activeModule}
-        openTasks={metrics.openTasks}
+        openTasks={openTaskCount}
         query={query}
         categoryFilter={categoryFilter}
         statusFilter={statusFilter}
@@ -230,7 +244,7 @@ function App() {
         {activeSection === 'Creative Lab' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Mockups' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Legal Orientation' && <WorkspaceFoundation module={activeModule} />}
-        {activeSection === 'Releases' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Releases' && <ReleasesView module={activeModule} records={filteredRecords} />}
         {activeSection === 'Web Ops' && <WorkspaceFoundation module={activeModule} />}
         {activeSection === 'Settings' && (
           <SettingsView
