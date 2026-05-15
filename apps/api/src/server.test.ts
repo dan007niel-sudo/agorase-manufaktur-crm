@@ -85,6 +85,14 @@ describe('API server', () => {
     expect(readEnv({ DATABASE_URL: 'postgresql://example/internal' }).databaseUrl).toBe('postgresql://example/internal')
   })
 
+  it('reads admin auth secrets from server-only env', () => {
+    const env = readEnv({ ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'secret', NODE_ENV: 'production' })
+
+    expect(env.adminPassword).toBe('pw')
+    expect(env.sessionSecret).toBe('secret')
+    expect(env.nodeEnv).toBe('production')
+  })
+
   it('uses allow-listed origins for CORS responses', async () => {
     const response = await handleRequest(
       new Request('http://localhost/api/health', {

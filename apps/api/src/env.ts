@@ -5,6 +5,9 @@ export interface ApiEnv {
   geminiImageModel: string
   allowedOrigins: string[]
   databaseUrl: string
+  adminPassword: string
+  sessionSecret: string
+  nodeEnv: string
 }
 
 export function readEnv(source: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env): ApiEnv {
@@ -18,5 +21,8 @@ export function readEnv(source: NodeJS.ProcessEnv | Record<string, string | unde
       .map((origin) => origin.trim())
       .filter(Boolean),
     databaseUrl: source.DATABASE_URL || '',
+    adminPassword: source.ADMIN_PASSWORD || '',
+    sessionSecret: source.SESSION_SECRET || '',
+    nodeEnv: source.NODE_ENV || 'development',
   }
 }

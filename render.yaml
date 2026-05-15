@@ -22,6 +22,10 @@ services:
         fromDatabase:
           name: agorase-fashion-os-db
           property: connectionString
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
 
   - type: web
     name: agorase-fashion-os-web
