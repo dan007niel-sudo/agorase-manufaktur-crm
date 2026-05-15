@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Manufactory } from '@agorase/shared'
+import type { Manufactory, OperationalTask, PartnerEvaluation, PartnerEvent } from '@agorase/shared'
 import { readEnv } from './env.js'
 import { buildSessionCookie } from './auth/session.js'
 import { handleRequest } from './index.js'
@@ -35,6 +35,44 @@ describe('API server', () => {
     notes: '',
   }
 
+  const testTask: OperationalTask = {
+    id: 'atelier-forma-task',
+    title: 'Line Sheet prüfen',
+    section: 'Command Center',
+    status: 'open',
+    priority: 'high',
+    partnerId: 'atelier-forma',
+    dueDate: '2026-05-15',
+    notes: '',
+    createdAt: '2026-05-15T00:00:00.000Z',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  }
+
+  const testEvent: PartnerEvent = {
+    id: 'evt-1',
+    partnerId: 'atelier-forma',
+    type: 'call',
+    title: 'Intro call',
+    body: 'Discussed samples.',
+    eventDate: '2026-05-15',
+    nextAction: 'Send brief',
+    createdAt: '2026-05-15T00:00:00.000Z',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  }
+
+  const testEvaluation: PartnerEvaluation = {
+    id: 'eval-1',
+    partnerId: 'atelier-forma',
+    fitScore: 5,
+    qualityScore: 4,
+    termsScore: 3,
+    riskScore: 2,
+    readinessScore: 4,
+    summary: 'Strong partner.',
+    createdAt: '2026-05-15T00:00:00.000Z',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  }
+
   function fakePartnersRepository(partners: Manufactory[] = []) {
     return {
       list: vi.fn(async () => partners),
@@ -42,6 +80,33 @@ describe('API server', () => {
       update: vi.fn(async (id: string, patch: Partial<Manufactory>) => ({ ...testPartner, ...patch, id })),
       delete: vi.fn(async () => undefined),
       importMany: vi.fn(async (nextPartners: Manufactory[]) => nextPartners),
+    }
+  }
+
+  function fakeTasksRepository(tasks: OperationalTask[] = [testTask]) {
+    return {
+      list: vi.fn(async () => tasks),
+      upsert: vi.fn(async (task: OperationalTask) => task),
+      update: vi.fn(async (id: string, patch: Partial<OperationalTask>) => ({ ...testTask, ...patch, id })),
+      delete: vi.fn(async () => undefined),
+    }
+  }
+
+  function fakePartnerEventsRepository(events: PartnerEvent[] = [testEvent]) {
+    return {
+      list: vi.fn(async () => events),
+      upsert: vi.fn(async (event: PartnerEvent) => event),
+      update: vi.fn(async (id: string, patch: Partial<PartnerEvent>) => ({ ...testEvent, ...patch, id })),
+      delete: vi.fn(async () => undefined),
+    }
+  }
+
+  function fakePartnerEvaluationsRepository(evaluations: PartnerEvaluation[] = [testEvaluation]) {
+    return {
+      list: vi.fn(async () => evaluations),
+      upsert: vi.fn(async (evaluation: PartnerEvaluation) => evaluation),
+      update: vi.fn(async (id: string, patch: Partial<PartnerEvaluation>) => ({ ...testEvaluation, ...patch, id })),
+      delete: vi.fn(async () => undefined),
     }
   }
 
@@ -378,5 +443,69 @@ describe('API server', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { code: 'database_unavailable', message: 'Database is not configured.' },
     })
+  })
+
+  it('rejects unauthenticated operational task requests', async () => {
+    const response = await handleRequest(new Request('http://localhost/api/tasks'), {
+      env: authenticatedEnv(),
+      tasksRepository: fakeTasksRepository(),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('routes authenticated operational task requests', async () => {
+    const env = authenticatedEnv()
+    const tasksRepository = fakeTasksRepository()
+    const response = await handleRequest(new Request('http://localhost/api/tasks', { headers: authenticatedHeaders(env) }), {
+      env,
+      tasksRepository,
+    })
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ tasks: [testTask] })
+    expect(tasksRepository.list).toHaveBeenCalled()
+  })
+
+  it('updates authenticated operational tasks by id', async () => {
+    const env = authenticatedEnv()
+    const tasksRepository = fakeTasksRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/tasks/atelier-forma-task', {
+        method: 'PUT',
+        headers: authenticatedHeaders(env),
+        body: JSON.stringify({ status: 'done' }),
+      }),
+      { env, tasksRepository },
+    )
+
+    expect(response.status).toBe(200)
+    expect(tasksRepository.update).toHaveBeenCalledWith('atelier-forma-task', { status: 'done' })
+  })
+
+  it('routes partner event requests with partner filters', async () => {
+    const env = authenticatedEnv()
+    const partnerEventsRepository = fakePartnerEventsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/partner-events?partnerId=atelier-forma', { headers: authenticatedHeaders(env) }),
+      { env, partnerEventsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ events: [testEvent] })
+    expect(partnerEventsRepository.list).toHaveBeenCalledWith('atelier-forma')
+  })
+
+  it('routes partner evaluation requests with partner filters', async () => {
+    const env = authenticatedEnv()
+    const partnerEvaluationsRepository = fakePartnerEvaluationsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/partner-evaluations?partnerId=atelier-forma', { headers: authenticatedHeaders(env) }),
+      { env, partnerEvaluationsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ evaluations: [testEvaluation] })
+    expect(partnerEvaluationsRepository.list).toHaveBeenCalledWith('atelier-forma')
   })
 })

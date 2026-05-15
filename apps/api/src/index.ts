@@ -2,18 +2,27 @@ import { readEnv, type ApiEnv } from './env.js'
 import { verifySessionCookie } from './auth/session.js'
 import { createDbPool } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
+import { createPostgresPartnerEvaluationsRepository } from './db/partnerEvaluationsRepository.js'
+import { createPostgresPartnerEventsRepository } from './db/partnerEventsRepository.js'
 import { createPostgresPartnersRepository } from './db/partnersRepository.js'
+import { createPostgresTasksRepository } from './db/tasksRepository.js'
 import { errorResponse, jsonResponse, resolveOrigin } from './http.js'
 import { healthRoute } from './routes/health.js'
 import { authRoute } from './routes/auth.js'
 import { mockupsRoute } from './routes/mockups.js'
+import { partnerEvaluationsRoute, type PartnerEvaluationsRepository } from './routes/partnerEvaluations.js'
+import { partnerEventsRoute, type PartnerEventsRepository } from './routes/partnerEvents.js'
 import { partnersRoute, type PartnersRepository } from './routes/partners.js'
 import { researchRoute } from './routes/research.js'
+import { tasksRoute, type TasksRepository } from './routes/tasks.js'
 import { visualizeRoute } from './routes/visualize.js'
 
 export interface ApiContext {
   env: ApiEnv
   partnersRepository?: PartnersRepository
+  tasksRepository?: TasksRepository
+  partnerEventsRepository?: PartnerEventsRepository
+  partnerEvaluationsRepository?: PartnerEvaluationsRepository
 }
 
 export async function handleRequest(request: Request, contextOrEnv: ApiEnv | ApiContext = readEnv()) {
@@ -40,6 +49,18 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
     }
     return partnersRoute(request, env, context.partnersRepository)
   }
+  if (pathname === '/api/tasks' || pathname.startsWith('/api/tasks/')) {
+    if (!context.tasksRepository) return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    return tasksRoute(request, env, context.tasksRepository)
+  }
+  if (pathname === '/api/partner-events' || pathname.startsWith('/api/partner-events/')) {
+    if (!context.partnerEventsRepository) return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    return partnerEventsRoute(request, env, context.partnerEventsRepository)
+  }
+  if (pathname === '/api/partner-evaluations' || pathname.startsWith('/api/partner-evaluations/')) {
+    if (!context.partnerEvaluationsRepository) return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    return partnerEvaluationsRoute(request, env, context.partnerEvaluationsRepository)
+  }
 
   return errorResponse('not_found', 'Route not found', 404, origin)
 }
@@ -52,6 +73,12 @@ function isProtectedPath(pathname: string) {
   return (
     pathname === '/api/partners' ||
     pathname.startsWith('/api/partners/') ||
+    pathname === '/api/tasks' ||
+    pathname.startsWith('/api/tasks/') ||
+    pathname === '/api/partner-events' ||
+    pathname.startsWith('/api/partner-events/') ||
+    pathname === '/api/partner-evaluations' ||
+    pathname.startsWith('/api/partner-evaluations/') ||
     pathname === '/api/research/partners' ||
     pathname === '/api/visualize' ||
     pathname === '/api/mockups/generate'
@@ -66,6 +93,9 @@ if (process.env.NODE_ENV !== 'test') {
   const context: ApiContext = {
     env,
     partnersRepository: pool ? createPostgresPartnersRepository(pool) : undefined,
+    tasksRepository: pool ? createPostgresTasksRepository(pool) : undefined,
+    partnerEventsRepository: pool ? createPostgresPartnerEventsRepository(pool) : undefined,
+    partnerEvaluationsRepository: pool ? createPostgresPartnerEvaluationsRepository(pool) : undefined,
   }
   const server = await import('node:http')
   server

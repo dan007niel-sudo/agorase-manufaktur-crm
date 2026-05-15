@@ -26,3 +26,49 @@ create table if not exists partners (
 );
 
 create index if not exists partners_updated_at_idx on partners (updated_at desc);
+
+create table if not exists tasks (
+  id text primary key,
+  title text not null,
+  section text not null,
+  status text not null,
+  priority text not null,
+  partner_id text not null default '',
+  due_date text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists tasks_status_due_date_idx on tasks (status, due_date);
+create index if not exists tasks_partner_id_idx on tasks (partner_id);
+
+create table if not exists partner_events (
+  id text primary key,
+  partner_id text not null,
+  type text not null,
+  title text not null,
+  body text not null default '',
+  event_date text not null default '',
+  next_action text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists partner_events_partner_id_idx on partner_events (partner_id);
+create index if not exists partner_events_event_date_idx on partner_events (event_date desc);
+
+create table if not exists partner_evaluations (
+  id text primary key,
+  partner_id text not null,
+  fit_score integer not null,
+  quality_score integer not null,
+  terms_score integer not null,
+  risk_score integer not null,
+  readiness_score integer not null,
+  summary text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists partner_evaluations_partner_id_idx on partner_evaluations (partner_id);

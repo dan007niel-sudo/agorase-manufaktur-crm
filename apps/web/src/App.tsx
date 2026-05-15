@@ -4,9 +4,7 @@ import { AppShell } from './app/AppShell'
 import { AuthGate } from './app/AuthGate'
 import {
   resetStoredStateFromQuery,
-  storageKeys,
   useAdminAuth,
-  useLocalState,
   type RecordsStatus,
 } from './app/authState'
 import { RecordForm } from './components/FormControls'
@@ -14,12 +12,14 @@ import { seedManufactories } from './data'
 import { calculateMetrics, createEmptyManufacture, deriveTasks, upsertManufacture } from './crmUtils'
 import { fashionOsModules, type FashionOsModule } from './fashionOs'
 import { importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
+import { listTasks, saveTask } from './api/tasksApi'
 import { CommandCenter } from './sections/command/CommandCenter'
 import { WorkspaceFoundation } from './sections/foundation/WorkspaceFoundation'
 import { PartnersView } from './sections/partners/PartnersView'
 import { ProductionView } from './sections/production/ProductionView'
 import { SettingsView } from './sections/settings/SettingsView'
 import { SourcingView } from './sections/sourcing/SourcingView'
+import type { OperationalTask } from '@agorase/shared'
 import type { Category, CrmTask, Manufactory, PipelineStatus } from './types'
 
 type Section = FashionOsModule['section']
@@ -32,7 +32,7 @@ function App() {
   const [records, setRecords] = useState<Manufactory[]>(seedManufactories)
   const [recordsStatus, setRecordsStatus] = useState<RecordsStatus>('loading')
   const [recordsError, setRecordsError] = useState('')
-  const [completedTasks, setCompletedTasks] = useLocalState<string[]>(storageKeys.completedTasks, [])
+  const [persistedTasks, setPersistedTasks] = useState<OperationalTask[]>([])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'Alle' | Category>('Alle')
@@ -66,9 +66,10 @@ function App() {
 
   const today = '2026-05-14'
   const metrics = calculateMetrics(records, today)
+  const persistedTasksById = useMemo(() => new Map(persistedTasks.map((task) => [task.id, task])), [persistedTasks])
   const tasks = deriveTasks(records, today).map((task) => ({
     ...task,
-    completed: completedTasks.includes(task.id),
+    completed: persistedTasksById.get(task.id)?.status === 'done',
   }))
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
 
@@ -85,6 +86,14 @@ function App() {
         setSelectedId((current) => current || nextRecords[0]?.id || '')
         setRecordsStatus('ready')
         setRecordsError('')
+        try {
+          const loadedTasks = await listTasks()
+          if (active) setPersistedTasks(loadedTasks)
+        } catch (caught) {
+          if (!active) return
+          setRecordsError(caught instanceof Error ? caught.message : 'Tasks konnten nicht geladen werden.')
+          setRecordsStatus('error')
+        }
       } catch (caught) {
         if (!active) return
         setRecords(seedManufactories)
@@ -157,10 +166,17 @@ function App() {
     }
   }
 
-  function toggleTask(task: CrmTask) {
-    setCompletedTasks((current) =>
-      current.includes(task.id) ? current.filter((id) => id !== task.id) : [...current, task.id],
-    )
+  async function toggleTask(task: CrmTask) {
+    const nextTask = toOperationalTask(task, persistedTasksById.get(task.id))
+    try {
+      const saved = await saveTask({ ...nextTask, status: task.completed ? 'open' : 'done' })
+      setPersistedTasks((current) => upsertTask(current, saved))
+      setRecordsStatus('ready')
+      setRecordsError('')
+    } catch (caught) {
+      setRecordsError(caught instanceof Error ? caught.message : 'Task konnte nicht gespeichert werden.')
+      setRecordsStatus('error')
+    }
   }
 
   return (
@@ -235,6 +251,28 @@ function App() {
       )}
     </AuthGate>
   )
+}
+
+function toOperationalTask(task: CrmTask, existing?: OperationalTask): OperationalTask {
+  const now = new Date().toISOString()
+  return {
+    id: task.id,
+    title: task.title,
+    section: 'Command Center',
+    status: existing?.status ?? (task.completed ? 'done' : 'open'),
+    priority: task.urgency === 'upcoming' ? 'medium' : 'high',
+    partnerId: task.manufactureId,
+    dueDate: task.dueDate,
+    notes: existing?.notes ?? '',
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  }
+}
+
+function upsertTask(tasks: OperationalTask[], nextTask: OperationalTask) {
+  return tasks.some((task) => task.id === nextTask.id)
+    ? tasks.map((task) => (task.id === nextTask.id ? nextTask : task))
+    : [...tasks, nextTask]
 }
 
 export default App
