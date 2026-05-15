@@ -72,3 +72,36 @@ create table if not exists partner_evaluations (
 );
 
 create index if not exists partner_evaluations_partner_id_idx on partner_evaluations (partner_id);
+
+create table if not exists production_profiles (
+  partner_id text primary key,
+  capabilities text not null default '',
+  materials text not null default '',
+  moq text not null default '',
+  lead_time text not null default '',
+  certifications text not null default '',
+  cost_notes text not null default '',
+  quality_notes text not null default '',
+  readiness_status text not null default 'unknown',
+  readiness_score integer not null default 0,
+  blocker text not null default '',
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists production_profiles_readiness_status_idx on production_profiles (readiness_status);
+
+create table if not exists sample_requests (
+  id text primary key,
+  partner_id text not null,
+  title text not null,
+  status text not null,
+  requested_at text not null default '',
+  target_date text not null default '',
+  cost_estimate text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists sample_requests_partner_id_idx on sample_requests (partner_id);
+create index if not exists sample_requests_status_target_date_idx on sample_requests (status, target_date);

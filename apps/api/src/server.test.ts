@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { Manufactory, OperationalTask, PartnerEvaluation, PartnerEvent } from '@agorase/shared'
+import type { Manufactory, OperationalTask, PartnerEvaluation, PartnerEvent, ProductionProfile, SampleRequest } from '@agorase/shared'
 import { readEnv } from './env.js'
 import { buildSessionCookie } from './auth/session.js'
 import { handleRequest } from './index.js'
@@ -73,6 +73,34 @@ describe('API server', () => {
     updatedAt: '2026-05-15T00:00:00.000Z',
   }
 
+  const testProductionProfile: ProductionProfile = {
+    partnerId: 'atelier-forma',
+    capabilities: 'Cut and sew',
+    materials: 'Cotton',
+    moq: '50 units',
+    leadTime: '6 weeks',
+    certifications: 'GOTS',
+    costNotes: 'Sample 120 EUR',
+    qualityNotes: 'Clean finishing',
+    readinessStatus: 'blocked',
+    readinessScore: 45,
+    blocker: 'Waiting for sample',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  }
+
+  const testSample: SampleRequest = {
+    id: 'sample-1',
+    partnerId: 'atelier-forma',
+    title: 'Overshirt sample',
+    status: 'requested',
+    requestedAt: '2026-05-15',
+    targetDate: '2026-06-01',
+    costEstimate: '120 EUR',
+    notes: 'Use black twill.',
+    createdAt: '2026-05-15T00:00:00.000Z',
+    updatedAt: '2026-05-15T00:00:00.000Z',
+  }
+
   function fakePartnersRepository(partners: Manufactory[] = []) {
     return {
       list: vi.fn(async () => partners),
@@ -106,6 +134,21 @@ describe('API server', () => {
       list: vi.fn(async () => evaluations),
       upsert: vi.fn(async (evaluation: PartnerEvaluation) => evaluation),
       update: vi.fn(async (id: string, patch: Partial<PartnerEvaluation>) => ({ ...testEvaluation, ...patch, id })),
+      delete: vi.fn(async () => undefined),
+    }
+  }
+
+  function fakeProductionProfilesRepository(profiles: ProductionProfile[] = [testProductionProfile]) {
+    return {
+      list: vi.fn(async () => profiles),
+      upsert: vi.fn(async (profile: ProductionProfile) => profile),
+    }
+  }
+
+  function fakeSampleRequestsRepository(samples: SampleRequest[] = [testSample]) {
+    return {
+      list: vi.fn(async () => samples),
+      upsert: vi.fn(async (sample: SampleRequest) => sample),
       delete: vi.fn(async () => undefined),
     }
   }
@@ -507,5 +550,60 @@ describe('API server', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ evaluations: [testEvaluation] })
     expect(partnerEvaluationsRepository.list).toHaveBeenCalledWith('atelier-forma')
+  })
+
+  it('rejects unauthenticated production requests', async () => {
+    const response = await handleRequest(new Request('http://localhost/api/production/profiles'), {
+      env: authenticatedEnv(),
+      productionProfilesRepository: fakeProductionProfilesRepository(),
+      sampleRequestsRepository: fakeSampleRequestsRepository(),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('routes authenticated production profile requests', async () => {
+    const env = authenticatedEnv()
+    const productionProfilesRepository = fakeProductionProfilesRepository()
+    const sampleRequestsRepository = fakeSampleRequestsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/production/profiles?partnerId=atelier-forma', { headers: authenticatedHeaders(env) }),
+      { env, productionProfilesRepository, sampleRequestsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ profiles: [testProductionProfile] })
+    expect(productionProfilesRepository.list).toHaveBeenCalledWith('atelier-forma')
+  })
+
+  it('saves authenticated production profiles by partner id', async () => {
+    const env = authenticatedEnv()
+    const productionProfilesRepository = fakeProductionProfilesRepository()
+    const sampleRequestsRepository = fakeSampleRequestsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/production/profiles/atelier-forma', {
+        method: 'PUT',
+        headers: authenticatedHeaders(env),
+        body: JSON.stringify({ ...testProductionProfile, partnerId: 'ignored' }),
+      }),
+      { env, productionProfilesRepository, sampleRequestsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    expect(productionProfilesRepository.upsert).toHaveBeenCalledWith({ ...testProductionProfile, partnerId: 'atelier-forma' })
+  })
+
+  it('routes authenticated sample requests', async () => {
+    const env = authenticatedEnv()
+    const productionProfilesRepository = fakeProductionProfilesRepository()
+    const sampleRequestsRepository = fakeSampleRequestsRepository()
+    const response = await handleRequest(
+      new Request('http://localhost/api/production/samples?partnerId=atelier-forma', { headers: authenticatedHeaders(env) }),
+      { env, productionProfilesRepository, sampleRequestsRepository },
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ samples: [testSample] })
+    expect(sampleRequestsRepository.list).toHaveBeenCalledWith('atelier-forma')
   })
 })
