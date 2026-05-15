@@ -47,11 +47,13 @@ Copy `.env.example` for local service configuration as needed. Do not commit rea
 
 ## Render Deployment
 
-Deploy the frontend as a Render Static Site from `apps/web/dist`. Deploy the backend as a Render Web Service. Set Gemini secrets only on the API service.
+Deploy the frontend as a Render Static Site from `apps/web/dist`. Deploy the backend as a Render Web Service. Set Gemini and auth secrets only on the API service.
 
 The repository includes a Render Blueprint at `render.yaml`.
 
 Phase 2A also provisions Render Postgres through `render.yaml`. The API receives `DATABASE_URL` from the database's internal connection string via `fromDatabase`; the web service never receives database credentials.
+
+Phase 2B protects the app with an API-issued admin session cookie. Set `ADMIN_PASSWORD` and `SESSION_SECRET` only on the API service.
 
 - GitHub repo: `https://github.com/dan007niel-sudo/agorase-manufaktur-crm`
 - Blueprint start link: `https://render.com/deploy?repo=https://github.com/dan007niel-sudo/agorase-manufaktur-crm`
@@ -62,6 +64,7 @@ Recommended API settings:
 - Start command: `npm run start -w @agorase/api`
 - Health check path: `/api/health`
 - Secret env: `GEMINI_API_KEY`
+- Auth secret env: `ADMIN_PASSWORD`, `SESSION_SECRET`
 - CORS env: `ALLOWED_ORIGINS=https://your-static-site.onrender.com`
 - Database env: `DATABASE_URL` from `agorase-fashion-os-db`
 
@@ -76,6 +79,8 @@ Initial Blueprint values to enter in Render:
 
 - API service `GEMINI_API_KEY`: your Gemini API key
 - API service `ALLOWED_ORIGINS`: the deployed web Static Site origin
+- API service `ADMIN_PASSWORD`: a strong admin password
+- API service `SESSION_SECRET`: a random long session signing secret
 - Web Static Site `VITE_API_BASE_URL`: the deployed API service origin
 
 `VITE_API_PROXY_TARGET` is local-development-only. Production browser calls should use `VITE_API_BASE_URL`.

@@ -2,7 +2,7 @@
 
 Status: ready for Render Blueprint setup after local verification.
 
-This note captures the Render settings for the current Phase 2A monorepo:
+This note captures the Render settings for the current Phase 2B monorepo:
 
 - `apps/web` for the React/Vite frontend
 - `apps/api` for the secure Node API service
@@ -74,6 +74,8 @@ Required:
 - `GEMINI_API_KEY`: Google Gemini API key. Set as a secret in Render.
 - `ALLOWED_ORIGINS`: deployed Static Site origin, for example `https://agorase-fashion-os-web.onrender.com`. Use a comma-separated list only when more than one trusted origin is required. Do not use `*` in production.
 - `DATABASE_URL`: Render Postgres connection string from `agorase-fashion-os-db`.
+- `ADMIN_PASSWORD`: strong admin password for the single admin login. Set as a secret in Render.
+- `SESSION_SECRET`: random long secret used to sign admin session cookies. Set as a secret in Render.
 
 Supported fallback/optional variables:
 
@@ -100,6 +102,8 @@ Forbidden on the web service:
 - `GEMINI_TEXT_MODEL`
 - `GEMINI_IMAGE_MODEL`
 - `DATABASE_URL`
+- `ADMIN_PASSWORD`
+- `SESSION_SECRET`
 - Any other provider secret or credential
 
 ## SPA Rewrite
@@ -122,6 +126,7 @@ Without this, direct visits to client routes such as `/partners`, `/creative-lab
 - API routes should validate request bodies before provider calls.
 - API error responses should normalize provider failures and avoid returning raw provider metadata that might include sensitive request details.
 - Provider model IDs should remain server-side configuration, not hard-coded into React components.
+- Admin sessions must use the API-issued `HttpOnly` cookie. Do not store auth tokens or auth secrets in browser storage or Vite env.
 
 ## Pre-Deploy Verification Checklist
 
@@ -151,14 +156,17 @@ rg 'openaiApiKey|Authorization: `Bearer|VITE_.*KEY|localStorage.*apiKey|GEMINI_A
 - Confirm the API service has `ALLOWED_ORIGINS` set to the exact deployed Static Site URL, not `*`.
 - Confirm Render created `agorase-fashion-os-db` in Frankfurt.
 - Confirm API env has `DATABASE_URL` from `agorase-fashion-os-db` with `property: connectionString`.
+- Confirm API env has `ADMIN_PASSWORD` and `SESSION_SECRET`.
+- Confirm web env does not contain auth secrets.
 - Confirm the API health endpoint returns provider readiness without exposing secret values.
-- Confirm live `GET /api/partners` returns `{ "partners": [...] }` or an empty array.
+- Confirm unauthenticated `GET /api/partners` returns `401`.
+- Confirm authenticated `GET /api/partners` returns persisted partner data.
 - Confirm browser requests go to the deployed API service, not directly to Google provider endpoints.
 - Confirm provider errors are redacted before they reach browser responses or Render logs intended for routine diagnostics.
 - Confirm deployment logs do not print full request bodies, API keys, Authorization headers, provider raw responses, or environment dumps.
 
 ## Blueprint Setup Notes
 
-- Keep `GEMINI_API_KEY` and `ALLOWED_ORIGINS` as `sync: false` values and enter them during the initial Render Blueprint creation flow.
+- Keep `GEMINI_API_KEY`, `ALLOWED_ORIGINS`, `ADMIN_PASSWORD`, and `SESSION_SECRET` as `sync: false` values and enter them during the initial Render Blueprint creation flow.
 - Render ignores `sync: false` values when updating an existing Blueprint, so add any new secrets manually to existing services.
 - Use a single Blueprint to manage these services to avoid configuration drift between multiple Blueprint syncs.
