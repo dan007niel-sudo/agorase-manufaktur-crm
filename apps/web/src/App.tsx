@@ -25,6 +25,7 @@ import {
   type AiResearchSuggestion,
 } from './aiResearch'
 import { fashionOsModules, type FashionOsModule } from './fashionOs'
+import { getSession, login, logout } from './authApi'
 import { importPartners, listPartners, savePartner, updatePartner } from './partnersApi'
 
 type Section = FashionOsModule['section']
@@ -45,6 +46,8 @@ function App() {
   const [records, setRecords] = useState<Manufactory[]>(seedManufactories)
   const [recordsStatus, setRecordsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [recordsError, setRecordsError] = useState('')
+  const [authStatus, setAuthStatus] = useState<'checking' | 'authenticated' | 'unauthenticated' | 'error'>('checking')
+  const [authError, setAuthError] = useState('')
   const [completedTasks, setCompletedTasks] = useLocalState<string[]>(storageKeys.completedTasks, [])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
@@ -88,6 +91,29 @@ function App() {
   useEffect(() => {
     let active = true
 
+    async function checkSession() {
+      try {
+        const session = await getSession()
+        if (!active) return
+        setAuthStatus(session.authenticated ? 'authenticated' : 'unauthenticated')
+        setAuthError('')
+      } catch {
+        if (!active) return
+        setAuthStatus('error')
+        setAuthError('Session konnte nicht geprüft werden.')
+      }
+    }
+
+    void checkSession()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return
+    let active = true
+
     async function loadRecords() {
       try {
         const loaded = await listPartners()
@@ -109,7 +135,23 @@ function App() {
     return () => {
       active = false
     }
-  }, [])
+  }, [authStatus])
+
+  async function handleLogin(password: string) {
+    try {
+      const session = await login(password)
+      setAuthStatus(session.authenticated ? 'authenticated' : 'unauthenticated')
+      setAuthError('')
+    } catch {
+      setAuthStatus('unauthenticated')
+      setAuthError('Login fehlgeschlagen.')
+    }
+  }
+
+  async function handleLogout() {
+    await logout()
+    setAuthStatus('unauthenticated')
+  }
 
   async function saveRecord(nextRecord: Manufactory) {
     try {
@@ -175,6 +217,10 @@ function App() {
     )
   }
 
+  if (authStatus !== 'authenticated') {
+    return <LoginView status={authStatus} error={authError} onLogin={handleLogin} />
+  }
+
   return (
     <div className="app-shell">
       <Sidebar activeSection={activeSection} onSelect={setActiveSection} metrics={metrics.openTasks} />
@@ -236,6 +282,7 @@ function App() {
                   : 'Partnerdaten werden über die API synchronisiert.'
             }
             onSeedSave={saveSeedRecords}
+            onLogout={handleLogout}
           />
         )}
       </main>
@@ -247,6 +294,46 @@ function App() {
         />
       )}
     </div>
+  )
+}
+
+function LoginView({
+  status,
+  error,
+  onLogin,
+}: {
+  status: 'checking' | 'unauthenticated' | 'error'
+  error: string
+  onLogin: (password: string) => void | Promise<void>
+}) {
+  const [password, setPassword] = useState('')
+  const loading = status === 'checking'
+
+  return (
+    <main className="login-shell">
+      <form
+        className="login-panel"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void onLogin(password)
+        }}
+      >
+        <img src={logo} alt="Agorase Logo" />
+        <label>
+          Passwort
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            autoFocus
+          />
+        </label>
+        {error && <div className="error-box">{error}</div>}
+        <button type="submit" className="primary-button" disabled={loading || !password}>
+          {loading ? 'Prüfe...' : 'Einloggen'}
+        </button>
+      </form>
+    </main>
   )
 }
 
@@ -600,16 +687,29 @@ function WorkspaceFoundation({ module }: { module: FashionOsModule }) {
   )
 }
 
-function SettingsView({ onSeedSave, status }: { onSeedSave: () => void | Promise<void>; status: string }) {
+function SettingsView({
+  onSeedSave,
+  onLogout,
+  status,
+}: {
+  onSeedSave: () => void | Promise<void>
+  onLogout: () => void | Promise<void>
+  status: string
+}) {
   return (
     <section className="panel">
       <PanelHeader title="Settings" />
       <div className="foundation-panel">
         <span className="label">Phase 2A</span>
         <p>{status}</p>
-        <button type="button" className="primary-button" onClick={onSeedSave}>
-          Seed speichern
-        </button>
+        <div className="settings-actions">
+          <button type="button" className="primary-button" onClick={onSeedSave}>
+            Seed speichern
+          </button>
+          <button type="button" onClick={onLogout}>
+            Logout
+          </button>
+        </div>
       </div>
     </section>
   )

@@ -5,6 +5,32 @@
   background: var(--canvas);
 }
 
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--paper);
+}
+
+.login-panel {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 16px;
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: var(--shadow);
+}
+
+.login-panel img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
 .sidebar {
   background: var(--rail);
   border-right: 1px solid var(--line);
@@ -521,7 +547,8 @@ label {
 }
 
 .task-row button,
-.follow-row button {
+.follow-row button,
+.settings-actions button {
   text-align: left;
   font-weight: 700;
 }
@@ -584,6 +611,20 @@ label {
   max-width: 620px;
   color: var(--soft-text);
   line-height: 1.5;
+}
+
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-actions button:not(.primary-button) {
+  border: 1px solid var(--line);
+  background: #fffdf8;
+  border-radius: 4px;
+  color: var(--ink);
+  padding: 9px 13px;
 }
 
 .ai-control-panel {
