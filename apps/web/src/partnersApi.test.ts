@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createEmptyManufacture } from './crmUtils'
-import { importPartners, listPartners, savePartner, updatePartner } from './partnersApi'
+import { importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -34,6 +34,18 @@ describe('partnersApi', () => {
     expect(fetch).toHaveBeenCalledWith(
       `/api/partners/${partner.id}`,
       expect.objectContaining({ method: 'PUT', credentials: 'include', body: JSON.stringify({ status: 'Antwort erhalten' }) }),
+    )
+  })
+
+  it('encodes partner ids when updating one partner', async () => {
+    const partner = createEmptyManufacture('Atelier Forma')
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ partner }), { status: 200 }))
+
+    await updatePartner('atelier/forma berlin', { nextStep: 'Call' })
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/partners/atelier%2Fforma%20berlin',
+      expect.objectContaining({ method: 'PUT', credentials: 'include', body: JSON.stringify({ nextStep: 'Call' }) }),
     )
   })
 
