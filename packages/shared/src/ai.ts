@@ -37,16 +37,3 @@ export interface PartnerResearchSuggestion {
 export interface PartnerResearchResponse {
   suggestions: PartnerResearchSuggestion[]
 }
-
-export interface ImageGenerationRequest {
-  prompt: string
-  aspectRatio: '1:1' | '4:5' | '3:4' | '16:9'
-  quality: 'draft' | 'high' | 'ultra'
-  referenceAssetIds: string[]
-}
-
-export interface ImageGenerationResponse {
-  status: 'queued' | 'completed' | 'failed'
-  assetId?: string
-  message: string
-}

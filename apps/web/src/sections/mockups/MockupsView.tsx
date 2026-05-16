@@ -115,6 +115,7 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
   }
 
   async function removeJob(id: string) {
+    if (!window.confirm('Mockup wirklich löschen?')) return
     try {
       await deleteMockupJob(id)
       setJobs((current) => current.filter((job) => job.id !== id))
@@ -162,6 +163,7 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
                     key={value}
                     type="button"
                     className={value === aspectRatio ? 'chip selected' : 'chip'}
+                    aria-pressed={value === aspectRatio}
                     onClick={() => setAspectRatio(value)}
                   >
                     {value}
@@ -177,6 +179,7 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
                     key={value}
                     type="button"
                     className={value === quality ? 'chip selected' : 'chip'}
+                    aria-pressed={value === quality}
                     onClick={() => setQuality(value)}
                   >
                     {QUALITY_LABELS[value]}

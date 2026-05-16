@@ -17,8 +17,21 @@ describe('fashionOsModules', () => {
     ])
   })
 
-  it('marks visible foundation modules without pretending everything is complete', () => {
-    expect(fashionOsModules.find((module) => module.section === 'Mockups')?.status).toBe('active')
-    expect(fashionOsModules.find((module) => module.section === 'Sourcing')?.status).toBe('active')
+  it('marks every live operating-system module as active', () => {
+    const liveSections: Array<typeof fashionOsModules[number]['section']> = [
+      'Command Center',
+      'Sourcing',
+      'Partners',
+      'Production',
+      'Creative Lab',
+      'Mockups',
+      'Legal Orientation',
+      'Releases',
+      'Web Ops',
+      'Settings',
+    ]
+    for (const section of liveSections) {
+      expect(fashionOsModules.find((module) => module.section === section)?.status).toBe('active')
+    }
   })
 })

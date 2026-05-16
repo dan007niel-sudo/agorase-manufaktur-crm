@@ -98,6 +98,7 @@ export function WebOpsView({ module }: { module: FashionOsModule }) {
 
   async function removeItem() {
     if (!selectedItem) return
+    if (!window.confirm(`Web Ops Eintrag "${selectedItem.title}" wirklich löschen?`)) return
     try {
       await deleteWebOpsItem(selectedItem.id)
       setItems((current) => current.filter((item) => item.id !== selectedItem.id))
@@ -379,7 +380,7 @@ function WebOpsChecklist({
             type="checkbox"
             checked={entry.done}
             onChange={() => onToggle(entry.id)}
-            aria-label={`Mark ${entry.label} done`}
+            aria-label={`Punkt ${entry.label} abhaken`}
           />
           <input value={entry.label} onChange={(event) => onLabelChange(entry.id, event.target.value)} />
           <button type="button" onClick={() => onRemove(entry.id)}>

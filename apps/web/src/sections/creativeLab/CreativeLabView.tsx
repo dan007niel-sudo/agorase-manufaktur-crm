@@ -117,6 +117,7 @@ export function CreativeLabView({ module }: { module: FashionOsModule }) {
 
   async function removeBrief() {
     if (!selectedBrief) return
+    if (!window.confirm(`Brief "${selectedBrief.title}" wirklich löschen?`)) return
     try {
       await deleteCreativeBrief(selectedBrief.id)
       setBriefs((current) => current.filter((brief) => brief.id !== selectedBrief.id))
@@ -193,6 +194,7 @@ export function CreativeLabView({ module }: { module: FashionOsModule }) {
   }
 
   async function removeSavedDirection(directionId: string) {
+    if (!window.confirm('Direction wirklich löschen?')) return
     try {
       await deleteCreativeDirection(directionId)
       setDirections((current) => current.filter((entry) => entry.id !== directionId))
@@ -230,6 +232,7 @@ export function CreativeLabView({ module }: { module: FashionOsModule }) {
   }
 
   async function removeTemplate(id: string) {
+    if (!window.confirm('Prompt-Template wirklich löschen?')) return
     try {
       await deletePromptTemplate(id)
       setTemplates((current) => current.filter((entry) => entry.id !== id))
@@ -252,6 +255,7 @@ export function CreativeLabView({ module }: { module: FashionOsModule }) {
               key={status}
               type="button"
               className={status === statusFilter ? 'chip selected' : 'chip'}
+              aria-pressed={status === statusFilter}
               onClick={() => setStatusFilter(status)}
             >
               {status}

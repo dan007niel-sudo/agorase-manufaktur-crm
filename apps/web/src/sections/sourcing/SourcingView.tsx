@@ -118,6 +118,7 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
               key={category}
               type="button"
               className={criteria.categories.includes(category) ? 'selected' : ''}
+              aria-pressed={criteria.categories.includes(category)}
               onClick={() => toggleCategory(category)}
             >
               {category}

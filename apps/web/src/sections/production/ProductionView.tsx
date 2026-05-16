@@ -96,7 +96,11 @@ export function ProductionView({
       />
       <section className="production-workspace panel">
         <PanelHeader title={module.label} />
+        {status === 'loading' && <div className="empty-state">Produktionsdaten werden geladen.</div>}
         {status === 'error' && <div className="error-box">{error}</div>}
+        {!records.length && status !== 'loading' && (
+          <div className="empty-state">Noch keine Partner – Produktionsprofile erscheinen, sobald Partner angelegt sind.</div>
+        )}
         <div className="production-summary">
           <div>
             <span className="label">Partner</span>

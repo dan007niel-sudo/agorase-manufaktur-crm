@@ -230,7 +230,7 @@ async function handleBrainstorm(
     return errorResponse('invalid_brainstorm_request', 'Prompt is required.', 400, origin)
   }
   if (!env.geminiApiKey) {
-    return errorResponse('brainstorm_unconfigured', 'AI provider is not configured.', 503, origin)
+    return errorResponse('brainstorm_not_configured', 'AI provider is not configured.', 503, origin)
   }
 
   const count = clampCount(Number(body.count) || 3)
