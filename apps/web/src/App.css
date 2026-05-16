@@ -1443,3 +1443,94 @@ label {
     grid-template-columns: 1fr;
   }
 }
+
+/* Phase 4B: Interactive button feedback polish.
+   .chip was missing a selected rule entirely; cards lacked transitions and hover affordances.
+   Adds cursor, hover, active, and transition so users see every state change immediately. */
+
+.chip {
+  cursor: pointer;
+  background: #fffdf8;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.2;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
+  user-select: none;
+}
+
+.chip:hover {
+  border-color: var(--ink);
+  background: #f4efe4;
+}
+
+.chip:active {
+  transform: scale(0.96);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.chip.selected {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--canvas);
+}
+
+.chip.selected:hover {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--canvas);
+  opacity: 0.92;
+}
+
+.category-picker button {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
+}
+
+.category-picker button:hover {
+  border-color: var(--ink);
+  background: #f4efe4;
+}
+
+.category-picker button:active {
+  transform: scale(0.96);
+}
+
+.category-picker button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.web-ops-card,
+.release-card,
+.creative-lab-card,
+.legal-card {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+}
+
+.web-ops-card:hover,
+.release-card:hover,
+.creative-lab-card:hover,
+.legal-card:hover:hover {
+  border-color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.web-ops-card:active,
+.release-card:active,
+.creative-lab-card:active,
+.legal-card:active:active {
+  transform: scale(0.995);
+}
+
+.web-ops-card:focus-visible,
+.release-card:focus-visible,
+.creative-lab-card:focus-visible,
+.legal-card:focus-visible:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
