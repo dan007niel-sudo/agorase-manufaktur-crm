@@ -1,6 +1,6 @@
 import { readEnv, type ApiEnv } from './env.js'
 import { verifySessionCookie } from './auth/session.js'
-import { createDbPool } from './db/client.js'
+import { createDbPool, type DbPool } from './db/client.js'
 import { runMigrations } from './db/migrate.js'
 import { createPostgresCreativeBriefsRepository } from './db/creativeBriefsRepository.js'
 import { createPostgresCreativeDirectionsRepository } from './db/creativeDirectionsRepository.js'
@@ -41,9 +41,12 @@ import { tasksRoute, type TasksRepository } from './routes/tasks.js'
 import { webOpsRoute, type WebOpsItemsRepository } from './routes/webOps.js'
 import { legalRoute, type LegalNotesRepository } from './routes/legal.js'
 import { createPostgresLegalNotesRepository } from './db/legalNotesRepository.js'
+import { adminExportRoute } from './routes/adminExport.js'
+import { adminDiagnosticsRoute } from './routes/adminDiagnostics.js'
 
 export interface ApiContext {
   env: ApiEnv
+  pool?: DbPool
   partnersRepository?: PartnersRepository
   tasksRepository?: TasksRepository
   partnerEventsRepository?: PartnerEventsRepository
@@ -142,6 +145,8 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
     }
     return legalRoute(request, env, context.legalNotesRepository)
   }
+  if (pathname === '/api/admin/export') return adminExportRoute(request, context)
+  if (pathname === '/api/admin/diagnostics') return adminDiagnosticsRoute(request, context)
 
   return errorResponse('not_found', 'Route not found', 404, origin)
 }
@@ -174,7 +179,9 @@ function isProtectedPath(pathname: string) {
     pathname === '/api/mockups' ||
     pathname.startsWith('/api/mockups/') ||
     pathname === '/api/legal' ||
-    pathname.startsWith('/api/legal/')
+    pathname.startsWith('/api/legal/') ||
+    pathname === '/api/admin' ||
+    pathname.startsWith('/api/admin/')
   )
 }
 
@@ -185,6 +192,7 @@ if (process.env.NODE_ENV !== 'test') {
   await runMigrations(pool)
   const context: ApiContext = {
     env,
+    pool: pool ?? undefined,
     partnersRepository: pool ? createPostgresPartnersRepository(pool) : undefined,
     tasksRepository: pool ? createPostgresTasksRepository(pool) : undefined,
     partnerEventsRepository: pool ? createPostgresPartnerEventsRepository(pool) : undefined,
