@@ -12,6 +12,7 @@ import { seedManufactories } from './data'
 import { calculateMetrics, createEmptyManufacture, deriveTasks, upsertManufacture } from './crmUtils'
 import { fashionOsModules, type FashionOsModule } from './fashionOs'
 import { listCreativeBriefs, listCreativeDirections } from './api/creativeApi'
+import { listLegalNotes } from './api/legalApi'
 import { listMockupJobs } from './api/mockupsApi'
 import { importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
 import { listProductionProfiles } from './api/productionApi'
@@ -21,7 +22,8 @@ import { listWebOpsItems } from './api/webOpsApi'
 import { CommandCenter } from './sections/command/CommandCenter'
 import { CreativeLabView } from './sections/creativeLab/CreativeLabView'
 import { createCreativeCommandTasks } from './sections/creativeLab/creativeTasks'
-import { WorkspaceFoundation } from './sections/foundation/WorkspaceFoundation'
+import { LegalView } from './sections/legal/LegalView'
+import { createLegalCommandTasks } from './sections/legal/legalTasks'
 import { MockupsView } from './sections/mockups/MockupsView'
 import { createMockupCommandTasks } from './sections/mockups/mockupTasks'
 import { PartnersView } from './sections/partners/PartnersView'
@@ -36,6 +38,7 @@ import type {
   CreativeBrief,
   CreativeDirection,
   FashionRelease,
+  LegalNote,
   MockupJob,
   OperationalTask,
   ProductionProfile,
@@ -62,6 +65,7 @@ function App() {
   const [creativeBriefs, setCreativeBriefs] = useState<CreativeBrief[]>([])
   const [creativeDirections, setCreativeDirections] = useState<CreativeDirection[]>([])
   const [mockupJobs, setMockupJobs] = useState<MockupJob[]>([])
+  const [legalNotes, setLegalNotes] = useState<LegalNote[]>([])
   const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'Alle' | Category>('Alle')
@@ -120,6 +124,7 @@ function App() {
         now: new Date().toISOString(),
       }),
     )
+    .concat(createLegalCommandTasks(legalNotes, persistedTasksById, today))
   const openTaskCount = tasks.filter((task) => !task.completed).length
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
 
@@ -146,6 +151,7 @@ function App() {
             loadedCreativeBriefs,
             loadedCreativeDirections,
             loadedMockupJobs,
+            loadedLegalNotes,
           ] = await Promise.all([
             listTasks(),
             listProductionProfiles(),
@@ -155,6 +161,7 @@ function App() {
             listCreativeBriefs(),
             listCreativeDirections(),
             listMockupJobs(),
+            listLegalNotes(),
           ])
           if (active) {
             setPersistedTasks(loadedTasks)
@@ -165,6 +172,7 @@ function App() {
             setCreativeBriefs(loadedCreativeBriefs)
             setCreativeDirections(loadedCreativeDirections)
             setMockupJobs(loadedMockupJobs)
+            setLegalNotes(loadedLegalNotes)
           }
         } catch (caught) {
           if (!active) return
@@ -302,7 +310,7 @@ function App() {
         )}
         {activeSection === 'Creative Lab' && <CreativeLabView module={activeModule} />}
         {activeSection === 'Mockups' && <MockupsView module={activeModule} />}
-        {activeSection === 'Legal Orientation' && <WorkspaceFoundation module={activeModule} />}
+        {activeSection === 'Legal Orientation' && <LegalView module={activeModule} />}
         {activeSection === 'Releases' && <ReleasesView module={activeModule} records={filteredRecords} />}
         {activeSection === 'Web Ops' && <WebOpsView module={activeModule} />}
         {activeSection === 'Settings' && (

@@ -39,6 +39,8 @@ import {
 import { researchRoute } from './routes/research.js'
 import { tasksRoute, type TasksRepository } from './routes/tasks.js'
 import { webOpsRoute, type WebOpsItemsRepository } from './routes/webOps.js'
+import { legalRoute, type LegalNotesRepository } from './routes/legal.js'
+import { createPostgresLegalNotesRepository } from './db/legalNotesRepository.js'
 
 export interface ApiContext {
   env: ApiEnv
@@ -56,6 +58,7 @@ export interface ApiContext {
   creativeDirectionsRepository?: CreativeDirectionsRepository
   promptTemplatesRepository?: PromptTemplatesRepository
   mockupJobsRepository?: MockupJobsRepository
+  legalNotesRepository?: LegalNotesRepository
 }
 
 export async function handleRequest(request: Request, contextOrEnv: ApiEnv | ApiContext = readEnv()) {
@@ -133,6 +136,12 @@ export async function handleRequest(request: Request, contextOrEnv: ApiEnv | Api
     }
     return webOpsRoute(request, env, context.webOpsItemsRepository)
   }
+  if (pathname === '/api/legal' || pathname.startsWith('/api/legal/')) {
+    if (!context.legalNotesRepository) {
+      return errorResponse('database_unavailable', 'Database is not configured.', 503, origin)
+    }
+    return legalRoute(request, env, context.legalNotesRepository)
+  }
 
   return errorResponse('not_found', 'Route not found', 404, origin)
 }
@@ -163,7 +172,9 @@ function isProtectedPath(pathname: string) {
     pathname.startsWith('/api/creative/') ||
     pathname === '/api/research/partners' ||
     pathname === '/api/mockups' ||
-    pathname.startsWith('/api/mockups/')
+    pathname.startsWith('/api/mockups/') ||
+    pathname === '/api/legal' ||
+    pathname.startsWith('/api/legal/')
   )
 }
 
@@ -188,6 +199,7 @@ if (process.env.NODE_ENV !== 'test') {
     creativeDirectionsRepository: pool ? createPostgresCreativeDirectionsRepository(pool) : undefined,
     promptTemplatesRepository: pool ? createPostgresPromptTemplatesRepository(pool) : undefined,
     mockupJobsRepository: pool ? createPostgresMockupJobsRepository(pool) : undefined,
+    legalNotesRepository: pool ? createPostgresLegalNotesRepository(pool) : undefined,
   }
   const server = await import('node:http')
   server

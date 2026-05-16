@@ -172,6 +172,31 @@ create index if not exists web_ops_items_release_id_idx on web_ops_items (releas
 create index if not exists web_ops_items_status_idx on web_ops_items (status);
 create index if not exists web_ops_items_kind_idx on web_ops_items (kind);
 
+create table if not exists legal_notes (
+  id text primary key,
+  title text not null,
+  topic text not null default '',
+  jurisdiction text not null default '',
+  risk_level text not null,
+  status text not null,
+  summary text not null default '',
+  body text not null default '',
+  checklist jsonb not null default '[]'::jsonb,
+  source_links text not null default '',
+  next_action text not null default '',
+  next_action_due text not null default '',
+  responsible text not null default '',
+  release_id text not null default '',
+  partner_id text not null default '',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists legal_notes_risk_level_idx on legal_notes (risk_level);
+create index if not exists legal_notes_status_idx on legal_notes (status);
+create index if not exists legal_notes_jurisdiction_idx on legal_notes (jurisdiction);
+
 create table if not exists creative_briefs (
   id text primary key,
   title text not null,

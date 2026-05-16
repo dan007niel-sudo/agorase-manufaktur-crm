@@ -77,15 +77,6 @@ export interface ProductionCapability {
   certifications: string[]
 }
 
-export interface LegalNote {
-  id: string
-  topic: string
-  jurisdiction: string
-  riskLevel: RiskLevel
-  status: 'open' | 'reviewing' | 'resolved'
-  nextAction: string
-  sources: string[]
-}
 
 export interface Release {
   id: string
