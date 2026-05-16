@@ -61,3 +61,46 @@ export async function generateMockup(request: GenerateMockupRequest): Promise<Ge
     body: JSON.stringify(request),
   })
 }
+
+export async function downloadMockupJob(id: string): Promise<void> {
+  const response = await fetch(`${apiBaseUrl}/api/mockups/${encodeURIComponent(id)}/download`, {
+    method: 'GET',
+    credentials: 'include',
+  })
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `Download failed with status ${response.status}`)
+  }
+  const blob = await response.blob()
+  const filename = parseContentDispositionFilename(response.headers.get('content-disposition')) ||
+    `agorase-mockup-${id}.png`
+  const url = URL.createObjectURL(blob)
+  try {
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+export function parseContentDispositionFilename(header: string | null): string {
+  if (!header) return ''
+  // Prefer RFC 5987 filename* if present
+  const star = header.match(/filename\*=([^;]+)/i)
+  if (star && star[1]) {
+    const value = star[1].trim()
+    const match = value.match(/^[^']*'[^']*'(.*)$/)
+    const raw = match ? match[1] : value
+    try {
+      return decodeURIComponent(raw)
+    } catch {
+      return raw
+    }
+  }
+  const simple = header.match(/filename="?([^";]+)"?/i)
+  return simple && simple[1] ? simple[1].trim() : ''
+}

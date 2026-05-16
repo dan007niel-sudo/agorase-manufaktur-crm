@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { MockupJob } from '@agorase/shared'
+import type { MockupJob, MockupReference } from '@agorase/shared'
 import { readEnv } from '../env.js'
 import { buildSessionCookie } from '../auth/session.js'
 import { handleRequest } from '../index.js'
@@ -23,8 +23,17 @@ const sampleJob: MockupJob = {
   releaseId: 'drop-1',
   briefId: 'brief-1',
   notes: '',
+  referenceImages: [],
   createdAt: '2026-05-15T00:00:00.000Z',
   updatedAt: '2026-05-15T00:00:00.000Z',
+}
+
+const validReference: MockupReference = {
+  id: 'ref-1',
+  name: 'mood.png',
+  data: 'aGVsbG8=',
+  mimeType: 'image/png',
+  kind: 'style',
 }
 
 function authenticatedEnv(source: Record<string, string | undefined> = {}) {
@@ -382,6 +391,247 @@ describe('mockups routes', () => {
     expect(body.job.status).toBe('completed')
     expect(body.job.imageData).toBe('')
     expect(body.job.imageUrl).toBe('https://example.test/big.png')
+  })
+
+  it('sends reference images before the text part in the upstream multimodal request', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const aiPayload = JSON.stringify({
+      candidates: [
+        {
+          content: {
+            parts: [{ inlineData: { data: 'aGVsbG8=', mimeType: 'image/png' } }],
+          },
+        },
+      ],
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(aiPayload, { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({
+          prompt: 'capsule SS27',
+          reference_images: [validReference],
+        }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const [, init] = fetchSpy.mock.calls[0]
+    const upstreamBody = JSON.parse(String(init?.body ?? '{}')) as {
+      contents?: Array<{ parts?: Array<Record<string, unknown>> }>
+    }
+    const parts = upstreamBody.contents?.[0]?.parts ?? []
+    expect(parts).toHaveLength(2)
+    expect(parts[0]).toEqual({
+      inlineData: { mimeType: 'image/png', data: 'aGVsbG8=' },
+    })
+    expect(parts[1]).toMatchObject({ text: expect.stringContaining('capsule SS27') })
+
+    const persisted = context.mockupJobsRepository.upserted
+    expect(persisted[0]?.referenceImages).toEqual([validReference])
+  })
+
+  it('rejects generate requests with more than three reference images', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const refs: MockupReference[] = Array.from({ length: 4 }, (_, index) => ({
+      ...validReference,
+      id: `ref-${index}`,
+    }))
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ prompt: 'capsule SS27', reference_images: refs }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(400)
+    expect(context.mockupJobsRepository.upsert).not.toHaveBeenCalled()
+  })
+
+  it('rejects generate requests with a disallowed reference mime type without touching the DB', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({
+          prompt: 'capsule SS27',
+          reference_images: [{ ...validReference, mimeType: 'image/gif' }],
+        }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(400)
+    expect(context.mockupJobsRepository.upsert).not.toHaveBeenCalled()
+  })
+
+  it('does not leak secrets in the generate response even when references are sent', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          candidates: [
+            { content: { parts: [{ inlineData: { data: 'aGVsbG8=', mimeType: 'image/png' } }] } },
+          ],
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({
+          prompt: 'capsule SS27',
+          reference_images: [validReference],
+        }),
+      }),
+      context,
+    )
+
+    const text = await response.text()
+    expect(text).not.toContain('test-secret')
+    expect(text).not.toContain('AIza')
+    expect(text).not.toContain('x-goog-api-key')
+    expect(text).not.toContain('googleapis.com')
+  })
+
+  describe('GET /api/mockups/:id/download', () => {
+    it('rejects unauthenticated download requests', async () => {
+      const response = await handleRequest(
+        new Request('http://localhost/api/mockups/mockup-1/download'),
+        fullContext(),
+      )
+      expect(response.status).toBe(401)
+    })
+
+    it('returns 404 for unknown jobs', async () => {
+      const context = fullContext()
+      context.mockupJobsRepository.get = vi.fn(async () => null)
+      const response = await handleRequest(
+        new Request('http://localhost/api/mockups/missing/download', {
+          headers: authenticatedHeaders(context.env),
+        }),
+        context,
+      )
+      expect(response.status).toBe(404)
+    })
+
+    it('returns 404 for jobs that are not completed', async () => {
+      const failedJob: MockupJob = { ...sampleJob, status: 'failed', imageData: '' }
+      const context = {
+        env: authenticatedEnv(),
+        mockupJobsRepository: {
+          ...fakeRepository([failedJob]),
+        },
+      }
+      const response = await handleRequest(
+        new Request('http://localhost/api/mockups/mockup-1/download', {
+          headers: authenticatedHeaders(context.env),
+        }),
+        context,
+      )
+      expect(response.status).toBe(404)
+      await expect(response.json()).resolves.toMatchObject({
+        error: { code: 'mockup_image_unavailable' },
+      })
+    })
+
+    it('streams inline base64 bytes with download headers', async () => {
+      const inlineJob: MockupJob = {
+        ...sampleJob,
+        imageUrl: '',
+        imageData: Buffer.from('hello').toString('base64'),
+        mimeType: 'image/png',
+      }
+      const context = {
+        env: authenticatedEnv(),
+        mockupJobsRepository: { ...fakeRepository([inlineJob]) },
+      }
+      const response = await handleRequest(
+        new Request('http://localhost/api/mockups/mockup-1/download', {
+          headers: authenticatedHeaders(context.env),
+        }),
+        context,
+      )
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('image/png')
+      const disposition = response.headers.get('content-disposition') || ''
+      expect(disposition).toContain('attachment;')
+      expect(disposition).toMatch(/filename="agorase-mockup-mockup-1-\d{4}-\d{2}-\d{2}\.png"/)
+      const bytes = Buffer.from(await response.arrayBuffer())
+      expect(bytes.toString('utf8')).toBe('hello')
+    })
+
+    it('proxies bytes from imageUrl when no inline data is stored', async () => {
+      const urlJob: MockupJob = {
+        ...sampleJob,
+        imageUrl: 'https://example.test/img.jpeg',
+        imageData: '',
+        mimeType: 'image/jpeg',
+      }
+      const context = {
+        env: authenticatedEnv(),
+        mockupJobsRepository: { ...fakeRepository([urlJob]) },
+      }
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(Buffer.from('proxied'), { status: 200 }),
+      )
+
+      const response = await handleRequest(
+        new Request('http://localhost/api/mockups/mockup-1/download', {
+          headers: authenticatedHeaders(context.env),
+        }),
+        context,
+      )
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe('image/jpeg')
+      const disposition = response.headers.get('content-disposition') || ''
+      expect(disposition).toMatch(/\.jpeg"$/)
+      const bytes = Buffer.from(await response.arrayBuffer())
+      expect(bytes.toString('utf8')).toBe('proxied')
+      expect(String(fetchSpy.mock.calls[0]?.[0])).toBe('https://example.test/img.jpeg')
+    })
+
+    it('sanitizes job ids when building the download filename', async () => {
+      const oddJob: MockupJob = {
+        ...sampleJob,
+        id: 'weird id$%^&*()',
+        imageUrl: '',
+        imageData: Buffer.from('hi').toString('base64'),
+        mimeType: 'image/png',
+      }
+      const context = {
+        env: authenticatedEnv(),
+        mockupJobsRepository: {
+          ...fakeRepository([oddJob]),
+          get: vi.fn(async () => oddJob),
+        },
+      }
+      const encoded = encodeURIComponent('weird id$%^&*()')
+      const response = await handleRequest(
+        new Request(`http://localhost/api/mockups/${encoded}/download`, {
+          headers: authenticatedHeaders(context.env),
+        }),
+        context,
+      )
+
+      expect(response.status).toBe(200)
+      const disposition = response.headers.get('content-disposition') || ''
+      // Only [A-Za-z0-9._-] survives; any other char becomes an underscore.
+      expect(disposition).toMatch(/filename="agorase-mockup-weird_id_+-\d{4}-\d{2}-\d{2}\.png"/)
+    })
   })
 
   it('marks the job failed when only base64 is returned and exceeds the 4MB limit', async () => {

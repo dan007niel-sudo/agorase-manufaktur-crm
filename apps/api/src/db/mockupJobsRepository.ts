@@ -1,8 +1,14 @@
 import {
+  MOCKUP_ALLOWED_REFERENCE_MIME_TYPES,
   MOCKUP_ASPECT_RATIOS,
   MOCKUP_JOB_STATUSES,
+  MOCKUP_MAX_REFERENCES,
+  MOCKUP_MAX_REFERENCE_BYTES,
   MOCKUP_QUALITIES,
+  MOCKUP_REFERENCE_KINDS,
   type MockupJob,
+  type MockupReference,
+  type MockupReferenceKind,
 } from '@agorase/shared'
 import { HttpError } from '../http.js'
 import type { DbPool } from './client.js'
@@ -22,6 +28,7 @@ const columns = [
   'release_id',
   'brief_id',
   'notes',
+  'reference_images',
 ] as const
 
 type Row = Record<string, unknown>
@@ -48,9 +55,38 @@ export function mapMockupJobRow(row: Row): MockupJob {
     releaseId: text(row.release_id),
     briefId: text(row.brief_id),
     notes: text(row.notes),
+    referenceImages: mapMockupReferencesValue(row.reference_images),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
   }
+}
+
+export function mapMockupReferencesValue(value: unknown): MockupReference[] {
+  if (Array.isArray(value)) return shapeReferences(value)
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value) as unknown
+      if (Array.isArray(parsed)) return shapeReferences(parsed)
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function shapeReferences(value: unknown[]): MockupReference[] {
+  return value
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    .map((entry) => ({
+      id: text(entry.id),
+      name: text(entry.name),
+      data: typeof entry.data === 'string' ? entry.data : '',
+      mimeType: text(entry.mimeType),
+      kind: (typeof entry.kind === 'string' && (MOCKUP_REFERENCE_KINDS as readonly string[]).includes(entry.kind)
+        ? entry.kind
+        : 'reference') as MockupReferenceKind,
+    }))
+    .filter((entry) => entry.id && entry.name && entry.data)
 }
 
 export function normalizeMockupJobInput(input: Partial<MockupJob>): MockupJob {
@@ -70,12 +106,69 @@ export function normalizeMockupJobInput(input: Partial<MockupJob>): MockupJob {
     releaseId: text(input.releaseId),
     briefId: text(input.briefId),
     notes: text(input.notes),
+    referenceImages: validateReferenceImages(input.referenceImages),
     createdAt: text(input.createdAt) || now,
     updatedAt: text(input.updatedAt) || now,
   }
   if (!value.id) throw new HttpError('invalid_mockup_job', 'Mockup job id is required.', 400)
   if (!value.prompt) throw new HttpError('invalid_mockup_job', 'Mockup prompt is required.', 400)
   return value
+}
+
+function validateReferenceImages(value: unknown): MockupReference[] {
+  if (value === undefined || value === null) return []
+  if (!Array.isArray(value)) {
+    throw new HttpError('invalid_mockup_job', 'Reference images must be an array.', 400)
+  }
+  if (value.length > MOCKUP_MAX_REFERENCES) {
+    throw new HttpError(
+      'invalid_mockup_job',
+      `At most ${MOCKUP_MAX_REFERENCES} reference images are allowed.`,
+      400,
+    )
+  }
+  return value.map((entry, index) => validateSingleReference(entry, index))
+}
+
+function validateSingleReference(entry: unknown, index: number): MockupReference {
+  if (!entry || typeof entry !== 'object') {
+    throw new HttpError('invalid_mockup_job', `Reference image #${index + 1} is invalid.`, 400)
+  }
+  const record = entry as Record<string, unknown>
+  const id = text(record.id)
+  const name = text(record.name)
+  const data = typeof record.data === 'string' ? record.data : ''
+  const mimeType = text(record.mimeType)
+  const kindValue = typeof record.kind === 'string' ? record.kind : ''
+  if (!id || !name || !data) {
+    throw new HttpError(
+      'invalid_mockup_job',
+      `Reference image #${index + 1} requires id, name, and data.`,
+      400,
+    )
+  }
+  if (!(MOCKUP_ALLOWED_REFERENCE_MIME_TYPES as readonly string[]).includes(mimeType)) {
+    throw new HttpError(
+      'invalid_mockup_job',
+      `Reference image #${index + 1} mime type is not allowed.`,
+      400,
+    )
+  }
+  if (!(MOCKUP_REFERENCE_KINDS as readonly string[]).includes(kindValue)) {
+    throw new HttpError(
+      'invalid_mockup_job',
+      `Reference image #${index + 1} kind is invalid.`,
+      400,
+    )
+  }
+  if (Buffer.byteLength(data, 'utf8') > MOCKUP_MAX_REFERENCE_BYTES) {
+    throw new HttpError(
+      'invalid_mockup_job',
+      `Reference image #${index + 1} exceeds the 2 MB limit.`,
+      400,
+    )
+  }
+  return { id, name, data, mimeType, kind: kindValue as MockupReferenceKind }
 }
 
 export async function listMockupJobs(
@@ -121,6 +214,7 @@ export async function upsertMockupJob(pool: DbPool, input: Partial<MockupJob>): 
     job.releaseId,
     job.briefId,
     job.notes,
+    JSON.stringify(job.referenceImages),
   ]
   const placeholders = values.map((_, index) => `$${index + 1}`).join(', ')
   const updates = columns

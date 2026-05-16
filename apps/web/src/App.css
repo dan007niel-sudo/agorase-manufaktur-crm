@@ -1192,6 +1192,162 @@ label {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
+.mockup-references {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mockup-reference-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mockup-reference-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  background: #fffdf8;
+  border: 1px dashed #d6cfbb;
+  border-radius: 8px;
+  align-items: stretch;
+  min-height: 110px;
+  cursor: default;
+}
+
+.mockup-reference-slot.empty {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #5a5246;
+}
+
+.mockup-reference-slot.empty input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.mockup-reference-thumb {
+  width: 100%;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #f4efe4;
+}
+
+.mockup-reference-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.mockup-reference-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mockup-reference-kind {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.75rem;
+}
+
+.mockup-reference-remove {
+  align-self: flex-start;
+  font-size: 0.75rem;
+  background: transparent;
+  border: 1px solid #d6cfbb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.mockup-reference-strip {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.mockup-reference-strip-thumb {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #f4efe4;
+}
+
+.mockup-reference-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mockup-reference-detail-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mockup-reference-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.mockup-reference-detail-thumb {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #f4efe4;
+}
+
+.mockup-detail-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.mockup-download-button {
+  align-self: stretch;
+  margin-top: 6px;
+  background: #fffdf8;
+  border: 1px solid #d6cfbb;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.creative-lab-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
 .legal-layout {
   display: grid;
   gap: 16px;

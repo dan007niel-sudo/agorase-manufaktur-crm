@@ -45,10 +45,10 @@ export function errorResponse(code: string, message: string, status = 400, origi
   return jsonResponse(body, status, origin)
 }
 
-export async function readJson<T>(request: Request): Promise<T> {
+export async function readJson<T>(request: Request, maxBytes = MAX_JSON_BODY_BYTES): Promise<T> {
   const contentLengthHeader = request.headers.get('content-length')
   const contentLength = contentLengthHeader ? Number(contentLengthHeader) : 0
-  if (Number.isFinite(contentLength) && contentLength > MAX_JSON_BODY_BYTES) {
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     throw new HttpError('request_too_large', 'Request body is too large.', 413)
   }
 

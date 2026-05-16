@@ -224,7 +224,8 @@ if (process.env.NODE_ENV !== 'test') {
         } as RequestInit)
         const response = await handleRequest(request, context)
         outgoing.writeHead(response.status, Object.fromEntries(response.headers.entries()))
-        outgoing.end(await response.text())
+        // arrayBuffer preserves binary payloads (e.g. mockup downloads); response.text() UTF-8-decodes and corrupts image bytes.
+        outgoing.end(Buffer.from(await response.arrayBuffer()))
       })
     })
     .listen(env.port, () => {

@@ -261,9 +261,12 @@ create table if not exists mockup_jobs (
   release_id text not null default '',
   brief_id text not null default '',
   notes text not null default '',
+  reference_images jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table mockup_jobs add column if not exists reference_images jsonb not null default '[]'::jsonb;
 
 create index if not exists mockup_jobs_status_idx on mockup_jobs (status);
 create index if not exists mockup_jobs_brief_id_idx on mockup_jobs (brief_id);

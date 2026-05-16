@@ -6,9 +6,10 @@ import {
   type MockupAspectRatio,
   type MockupJob,
   type MockupQuality,
+  type MockupReference,
 } from '@agorase/shared'
 import type { ApiEnv } from '../env.js'
-import type { MockupJobListFilters } from '../db/mockupJobsRepository.js'
+import { normalizeMockupJobInput, type MockupJobListFilters } from '../db/mockupJobsRepository.js'
 import {
   errorResponse,
   HttpError,
@@ -26,6 +27,8 @@ export interface MockupJobsRepository {
 }
 
 const MAX_IMAGE_DATA_BYTES = 4 * 1024 * 1024
+// Allow a generate body up to 3 references × 2 MB + slack for prompt and JSON overhead.
+const MAX_GENERATE_BODY_BYTES = 8 * 1024 * 1024
 
 export async function mockupsRoute(request: Request, env: ApiEnv, repository: MockupJobsRepository) {
   const origin = resolveOrigin(request, env.allowedOrigins)
@@ -44,6 +47,12 @@ export async function mockupsRoute(request: Request, env: ApiEnv, repository: Mo
         releaseId: url.searchParams.get('release') ?? url.searchParams.get('releaseId') ?? undefined,
       }
       return jsonResponse({ jobs: await repository.list(filters) }, 200, origin)
+    }
+
+    const downloadMatch = pathname.match(/^\/api\/mockups\/([^/]+)\/download$/)
+    if (downloadMatch && request.method === 'GET') {
+      const jobId = decodeURIComponent(downloadMatch[1] ?? '')
+      return await handleDownload(jobId, repository, origin)
     }
 
     if (pathname.startsWith('/api/mockups/')) {
@@ -74,7 +83,7 @@ async function handleGenerate(
   repository: MockupJobsRepository,
   origin: string,
 ) {
-  const body = await readJson<Partial<GenerateMockupRequest>>(request)
+  const body = await readJson<Partial<GenerateMockupRequest>>(request, MAX_GENERATE_BODY_BYTES)
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
   if (!prompt) {
     return errorResponse('invalid_mockup_request', 'Prompt is required.', 400, origin)
@@ -89,25 +98,34 @@ async function handleGenerate(
   const briefId = typeof body.brief_id === 'string' ? body.brief_id.trim() : ''
   const releaseId = typeof body.release_id === 'string' ? body.release_id.trim() : ''
   const notes = typeof body.notes === 'string' ? body.notes.trim() : ''
+  const referenceImages = Array.isArray(body.reference_images) ? body.reference_images : []
 
   const now = new Date().toISOString()
-  const pending: MockupJob = {
-    id: generateJobId(),
-    prompt,
-    referenceNotes,
-    aspectRatio,
-    quality,
-    status: 'pending',
-    modelUsed: env.geminiImageModel,
-    imageUrl: '',
-    imageData: '',
-    mimeType: '',
-    error: '',
-    releaseId,
-    briefId,
-    notes,
-    createdAt: now,
-    updatedAt: now,
+  let pending: MockupJob
+  try {
+    // Validate up-front so a bad reference rejects with 400 BEFORE we touch the DB.
+    pending = normalizeMockupJobInput({
+      id: generateJobId(),
+      prompt,
+      referenceNotes,
+      aspectRatio,
+      quality,
+      status: 'pending',
+      modelUsed: env.geminiImageModel,
+      imageUrl: '',
+      imageData: '',
+      mimeType: '',
+      error: '',
+      releaseId,
+      briefId,
+      notes,
+      referenceImages,
+      createdAt: now,
+      updatedAt: now,
+    })
+  } catch (error) {
+    const safe = safeHttpError(error, 'invalid_mockup_request', 'Invalid mockup request.', 400)
+    return errorResponse(safe.code, safe.message, safe.status, origin)
   }
 
   const stored = await repository.upsert(pending)
@@ -119,6 +137,7 @@ async function handleGenerate(
       referenceNotes,
       aspectRatio,
       quality,
+      referenceImages,
     })
   } catch (error) {
     const failed = await repository.upsert({
@@ -172,11 +191,64 @@ async function handleGenerate(
   return jsonResponse(responseBody, 200, origin)
 }
 
+async function handleDownload(jobId: string, repository: MockupJobsRepository, origin: string) {
+  if (!jobId) return errorResponse('mockup_not_found', 'Mockup job not found.', 404, origin)
+  const job = await repository.get(jobId)
+  if (!job) return errorResponse('mockup_not_found', 'Mockup job not found.', 404, origin)
+  if (job.status !== 'completed') {
+    return errorResponse('mockup_image_unavailable', 'Mockup image is not available.', 404, origin)
+  }
+
+  const mimeType = job.mimeType || 'image/png'
+  const filename = buildDownloadFilename(job.id, mimeType)
+  const headers: Record<string, string> = {
+    'content-type': mimeType,
+    'content-disposition': `attachment; filename="${filename}"`,
+    'access-control-allow-origin': origin,
+    'access-control-allow-credentials': 'true',
+    vary: 'Origin',
+  }
+
+  if (job.imageData) {
+    const buffer = Buffer.from(job.imageData, 'base64')
+    return new Response(buffer, { status: 200, headers })
+  }
+
+  if (job.imageUrl) {
+    try {
+      const upstream = await fetch(job.imageUrl)
+      if (!upstream.ok) {
+        return errorResponse('mockup_image_unavailable', 'Mockup image is not available.', 404, origin)
+      }
+      const arrayBuffer = await upstream.arrayBuffer()
+      return new Response(Buffer.from(arrayBuffer), { status: 200, headers })
+    } catch {
+      return errorResponse('mockup_image_unavailable', 'Mockup image is not available.', 404, origin)
+    }
+  }
+
+  return errorResponse('mockup_image_unavailable', 'Mockup image is not available.', 404, origin)
+}
+
+function buildDownloadFilename(id: string, mimeType: string): string {
+  const ext = mimeTypeToExtension(mimeType)
+  const today = new Date().toISOString().slice(0, 10)
+  const safeId = id.replace(/[^A-Za-z0-9._-]/g, '_') || 'mockup'
+  return `agorase-mockup-${safeId}-${today}.${ext}`
+}
+
+function mimeTypeToExtension(mimeType: string): string {
+  if (mimeType === 'image/jpeg') return 'jpeg'
+  if (mimeType === 'image/webp') return 'webp'
+  return 'png'
+}
+
 interface ProviderImageRequest {
   prompt: string
   referenceNotes: string
   aspectRatio: MockupAspectRatio
   quality: MockupQuality
+  referenceImages: MockupReference[]
 }
 
 interface ProviderImageResult {
@@ -185,7 +257,7 @@ interface ProviderImageResult {
   mimeType: string
 }
 
-export function buildMockupPrompt(input: ProviderImageRequest) {
+export function buildMockupPrompt(input: Pick<ProviderImageRequest, 'prompt' | 'referenceNotes' | 'aspectRatio' | 'quality'>) {
   const lines = [input.prompt]
   if (input.referenceNotes) {
     lines.push(`Reference notes: ${input.referenceNotes}`)
@@ -197,6 +269,12 @@ export function buildMockupPrompt(input: ProviderImageRequest) {
 
 async function callGeminiForImage(env: ApiEnv, input: ProviderImageRequest): Promise<ProviderImageResult> {
   const promptText = buildMockupPrompt(input)
+  const parts: Array<Record<string, unknown>> = []
+  for (const ref of input.referenceImages) {
+    parts.push({ inlineData: { mimeType: ref.mimeType, data: ref.data } })
+  }
+  parts.push({ text: promptText })
+
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(env.geminiImageModel)}:generateContent`,
     {
@@ -206,7 +284,7 @@ async function callGeminiForImage(env: ApiEnv, input: ProviderImageRequest): Pro
         'x-goog-api-key': env.geminiApiKey,
       },
       body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: promptText }] }],
+        contents: [{ role: 'user', parts }],
         generationConfig: {
           responseModalities: ['IMAGE'],
           imageConfig: {
@@ -232,11 +310,11 @@ async function callGeminiForImage(env: ApiEnv, input: ProviderImageRequest): Pro
     }>
   }
 
-  const parts = payload.candidates?.[0]?.content?.parts ?? []
+  const responseParts = payload.candidates?.[0]?.content?.parts ?? []
   let imageData = ''
   let imageUrl = ''
   let mimeType = ''
-  for (const part of parts) {
+  for (const part of responseParts) {
     if (!imageData && part.inlineData?.data) {
       imageData = part.inlineData.data
       mimeType = part.inlineData.mimeType ?? mimeType

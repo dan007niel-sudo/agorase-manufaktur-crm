@@ -1,15 +1,26 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  MOCKUP_ALLOWED_REFERENCE_MIME_TYPES,
   MOCKUP_ASPECT_RATIOS,
+  MOCKUP_MAX_REFERENCES,
+  MOCKUP_MAX_REFERENCE_BYTES,
   MOCKUP_QUALITIES,
+  MOCKUP_REFERENCE_KINDS,
   type CreativeBrief,
   type FashionRelease,
   type MockupAspectRatio,
   type MockupJob,
   type MockupQuality,
+  type MockupReference,
+  type MockupReferenceKind,
 } from '@agorase/shared'
 import { listCreativeBriefs } from '../../api/creativeApi'
-import { deleteMockupJob, generateMockup, listMockupJobs } from '../../api/mockupsApi'
+import {
+  deleteMockupJob,
+  downloadMockupJob,
+  generateMockup,
+  listMockupJobs,
+} from '../../api/mockupsApi'
 import { listReleases } from '../../api/releasesApi'
 import { PanelHeader } from '../../components/Panel'
 import type { FashionOsModule } from '../../fashionOs'
@@ -26,6 +37,12 @@ const STATUS_LABELS: Record<MockupJob['status'], string> = {
   failed: 'Fehlgeschlagen',
 }
 
+const REFERENCE_KIND_LABELS: Record<MockupReferenceKind, string> = {
+  style: 'Style',
+  sketch: 'Skizze',
+  reference: 'Referenz',
+}
+
 export function MockupsView({ module }: { module: FashionOsModule }) {
   const [jobs, setJobs] = useState<MockupJob[]>([])
   const [briefs, setBriefs] = useState<CreativeBrief[]>([])
@@ -39,8 +56,10 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
   const [briefId, setBriefId] = useState('')
   const [releaseId, setReleaseId] = useState('')
   const [notes, setNotes] = useState('')
+  const [references, setReferences] = useState<MockupReference[]>([])
   const [running, setRunning] = useState(false)
   const [selectedJobId, setSelectedJobId] = useState('')
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const sortedJobs = useMemo(
     () => [...jobs].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1)),
@@ -97,6 +116,7 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
         brief_id: briefId || undefined,
         release_id: releaseId || undefined,
         notes: notes.trim() || undefined,
+        reference_images: references.length ? references : undefined,
       })
       setJobs((current) => upsertJob(current, response.job))
       setSelectedJobId(response.job.id)
@@ -128,6 +148,63 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
     }
   }
 
+  async function downloadJob(id: string) {
+    try {
+      await downloadMockupJob(id)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Mockup konnte nicht heruntergeladen werden.')
+      setLoadStatus('error')
+    }
+  }
+
+  async function onFilesSelected(files: FileList | null) {
+    if (!files || !files.length) return
+    const remaining = MOCKUP_MAX_REFERENCES - references.length
+    if (remaining <= 0) return
+    const accepted: MockupReference[] = []
+    for (const file of Array.from(files).slice(0, remaining)) {
+      if (!(MOCKUP_ALLOWED_REFERENCE_MIME_TYPES as readonly string[]).includes(file.type)) {
+        setError('Nur PNG, JPEG oder WebP.')
+        setLoadStatus('error')
+        continue
+      }
+      if (file.size > MOCKUP_MAX_REFERENCE_BYTES) {
+        setError('Maximal 2 MB pro Datei.')
+        setLoadStatus('error')
+        continue
+      }
+      try {
+        const data = await readFileAsBase64(file)
+        accepted.push({
+          id: `ref-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          name: file.name,
+          data,
+          mimeType: file.type,
+          kind: 'reference',
+        })
+      } catch {
+        setError('Datei konnte nicht gelesen werden.')
+        setLoadStatus('error')
+      }
+    }
+    if (accepted.length) {
+      setReferences((current) => [...current, ...accepted].slice(0, MOCKUP_MAX_REFERENCES))
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  function removeReference(id: string) {
+    setReferences((current) => current.filter((ref) => ref.id !== id))
+  }
+
+  function updateReferenceKind(id: string, kind: MockupReferenceKind) {
+    setReferences((current) =>
+      current.map((ref) => (ref.id === id ? { ...ref, kind } : ref)),
+    )
+  }
+
   return (
     <section className="creative-lab-layout">
       <aside className="creative-lab-workspace panel">
@@ -154,6 +231,58 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
               placeholder="Stil-, Material- oder Stimmungsreferenzen für das Modell"
             />
           </label>
+          <div className="mockup-references">
+            <span className="field-label">Referenzbilder ({references.length}/{MOCKUP_MAX_REFERENCES})</span>
+            <div className="mockup-reference-grid">
+              {references.map((ref) => (
+                <div key={ref.id} className="mockup-reference-slot filled">
+                  <img
+                    src={`data:${ref.mimeType};base64,${ref.data}`}
+                    alt={ref.name}
+                    className="mockup-reference-thumb"
+                  />
+                  <div className="mockup-reference-meta">
+                    <span className="mockup-reference-name" title={ref.name}>{ref.name}</span>
+                    <label className="mockup-reference-kind">
+                      Art
+                      <select
+                        value={ref.kind}
+                        onChange={(event) =>
+                          updateReferenceKind(ref.id, event.target.value as MockupReferenceKind)
+                        }
+                      >
+                        {MOCKUP_REFERENCE_KINDS.map((kind) => (
+                          <option key={kind} value={kind}>
+                            {REFERENCE_KIND_LABELS[kind]}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className="mockup-reference-remove"
+                      onClick={() => removeReference(ref.id)}
+                    >
+                      Entfernen
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {references.length < MOCKUP_MAX_REFERENCES && (
+                <label className="mockup-reference-slot empty">
+                  <span>Referenz hinzufügen</span>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    aria-label="Referenzbild hinzufügen"
+                    onChange={(event) => void onFilesSelected(event.target.files)}
+                  />
+                </label>
+              )}
+            </div>
+            <small>PNG, JPEG oder WebP, max. 2 MB pro Datei.</small>
+          </div>
           <div className="form-grid two">
             <div>
               <span className="field-label">Seitenverhältnis</span>
@@ -231,23 +360,52 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
         <PanelHeader title="Verlauf" />
         {!sortedJobs.length && <div className="empty-state">Noch keine Mockups generiert.</div>}
         {sortedJobs.map((job) => (
-          <button
+          <div
             key={job.id}
-            type="button"
             className={job.id === selectedJob?.id ? 'creative-lab-card selected' : 'creative-lab-card'}
-            onClick={() => setSelectedJobId(job.id)}
           >
-            <strong>{job.prompt.slice(0, 80) || 'Ohne Prompt'}</strong>
-            <span>{STATUS_LABELS[job.status]}</span>
-            <small>{`${job.aspectRatio} · ${QUALITY_LABELS[job.quality]}`}</small>
-          </button>
+            <button
+              type="button"
+              className="creative-lab-card-body"
+              onClick={() => setSelectedJobId(job.id)}
+            >
+              <strong>{job.prompt.slice(0, 80) || 'Ohne Prompt'}</strong>
+              <span>{STATUS_LABELS[job.status]}</span>
+              <small>{`${job.aspectRatio} · ${QUALITY_LABELS[job.quality]}`}</small>
+              {job.referenceImages.length > 0 && (
+                <div className="mockup-reference-strip">
+                  {job.referenceImages.slice(0, MOCKUP_MAX_REFERENCES).map((ref) => (
+                    <img
+                      key={ref.id}
+                      src={`data:${ref.mimeType};base64,${ref.data}`}
+                      alt={ref.name}
+                      className="mockup-reference-strip-thumb"
+                    />
+                  ))}
+                </div>
+              )}
+            </button>
+            {job.status === 'completed' && (
+              <button
+                type="button"
+                className="mockup-download-button"
+                onClick={() => void downloadJob(job.id)}
+              >
+                Download
+              </button>
+            )}
+          </div>
         ))}
       </aside>
 
       <section className="creative-lab-directions panel">
         <PanelHeader title="Detail" />
         {selectedJob ? (
-          <MockupDetail job={selectedJob} onDelete={() => void removeJob(selectedJob.id)} />
+          <MockupDetail
+            job={selectedJob}
+            onDelete={() => void removeJob(selectedJob.id)}
+            onDownload={() => void downloadJob(selectedJob.id)}
+          />
         ) : (
           <div className="empty-state">Wähle ein Mockup aus dem Verlauf.</div>
         )}
@@ -256,15 +414,31 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
   )
 }
 
-function MockupDetail({ job, onDelete }: { job: MockupJob; onDelete: () => void }) {
+function MockupDetail({
+  job,
+  onDelete,
+  onDownload,
+}: {
+  job: MockupJob
+  onDelete: () => void
+  onDownload: () => void
+}) {
   const previewSrc = resolveImageSrc(job)
+  const canDownload = job.status === 'completed' && Boolean(job.imageUrl || job.imageData)
   return (
     <div className="creative-lab-direction-card saved">
       <div className="panel-header compact">
         <h3>{STATUS_LABELS[job.status]}</h3>
-        <button type="button" onClick={onDelete}>
-          Löschen
-        </button>
+        <div className="mockup-detail-actions">
+          {canDownload && (
+            <button type="button" className="primary-button" onClick={onDownload}>
+              Download
+            </button>
+          )}
+          <button type="button" onClick={onDelete}>
+            Löschen
+          </button>
+        </div>
       </div>
       {previewSrc ? (
         <img src={previewSrc} alt={job.prompt || 'Mockup'} className="mockup-preview" />
@@ -276,6 +450,23 @@ function MockupDetail({ job, onDelete }: { job: MockupJob; onDelete: () => void 
         </div>
       )}
       <p>{job.prompt}</p>
+      {job.referenceImages.length > 0 && (
+        <div className="mockup-reference-detail">
+          <span className="field-label">Referenzbilder</span>
+          <div className="mockup-reference-detail-row">
+            {job.referenceImages.map((ref) => (
+              <figure key={ref.id} className="mockup-reference-detail-item">
+                <img
+                  src={`data:${ref.mimeType};base64,${ref.data}`}
+                  alt={ref.name}
+                  className="mockup-reference-detail-thumb"
+                />
+                <figcaption>{REFERENCE_KIND_LABELS[ref.kind]}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      )}
       {job.referenceNotes && <small>Referenzen: {job.referenceNotes}</small>}
       <small>Seitenverhältnis: {job.aspectRatio}</small>
       <small>Qualität: {QUALITY_LABELS[job.quality]}</small>
@@ -308,4 +499,17 @@ function upsertJob(jobs: MockupJob[], next: MockupJob) {
   return jobs.some((job) => job.id === next.id)
     ? jobs.map((job) => (job.id === next.id ? next : job))
     : [...jobs, next]
+}
+
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : ''
+      const comma = result.indexOf(',')
+      resolve(comma >= 0 ? result.slice(comma + 1) : result)
+    }
+    reader.onerror = () => reject(reader.error ?? new Error('FileReader failed'))
+    reader.readAsDataURL(file)
+  })
 }

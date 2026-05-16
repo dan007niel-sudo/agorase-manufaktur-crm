@@ -1,10 +1,13 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { MockupJob } from '@agorase/shared'
+import type { MockupJob, MockupReference } from '@agorase/shared'
 import {
   deleteMockupJob,
+  downloadMockupJob,
   generateMockup,
   getMockupJob,
   listMockupJobs,
+  parseContentDispositionFilename,
 } from './mockupsApi'
 
 afterEach(() => vi.restoreAllMocks())
@@ -24,8 +27,17 @@ const job: MockupJob = {
   releaseId: 'drop-1',
   briefId: 'brief-1',
   notes: '',
+  referenceImages: [],
   createdAt: '2026-05-15T00:00:00.000Z',
   updatedAt: '2026-05-15T00:00:00.000Z',
+}
+
+const sampleReference: MockupReference = {
+  id: 'ref-1',
+  name: 'inspo.png',
+  data: 'aGVsbG8=',
+  mimeType: 'image/png',
+  kind: 'style',
 }
 
 describe('mockupsApi', () => {
@@ -88,5 +100,104 @@ describe('mockupsApi', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('boom', { status: 500 }))
 
     await expect(listMockupJobs()).rejects.toThrow('boom')
+  })
+
+  it('sends reference images in the generate request body', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ job }), { status: 200 }),
+    )
+
+    await generateMockup({
+      prompt: 'capsule SS27',
+      reference_images: [sampleReference],
+    })
+
+    const [, init] = fetchSpy.mock.calls[0]
+    expect(init?.credentials).toBe('include')
+    const body = JSON.parse(String(init?.body ?? '{}')) as { reference_images?: MockupReference[] }
+    expect(body.reference_images).toEqual([sampleReference])
+  })
+
+  describe('downloadMockupJob', () => {
+    it('triggers an anchor click with the parsed filename and credentials', async () => {
+      const blob = new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' })
+      const blobResponse = new Response(blob, {
+        status: 200,
+        headers: {
+          'content-type': 'image/png',
+          'content-disposition': 'attachment; filename="agorase-mockup-mockup-1-2026-05-16.png"',
+        },
+      })
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(blobResponse)
+      const createSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
+      const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+      const clickSpy = vi.fn()
+      const originalCreate = document.createElement.bind(document)
+      const createElementSpy = vi
+        .spyOn(document, 'createElement')
+        .mockImplementation((tag: string) => {
+          const element = originalCreate(tag) as HTMLAnchorElement
+          if (tag.toLowerCase() === 'a') {
+            element.click = clickSpy
+          }
+          return element
+        })
+
+      await downloadMockupJob('mockup-1')
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/api/mockups/mockup-1/download',
+        expect.objectContaining({ method: 'GET', credentials: 'include' }),
+      )
+      expect(createSpy).toHaveBeenCalledWith(blob)
+      expect(clickSpy).toHaveBeenCalledTimes(1)
+      expect(revokeSpy).toHaveBeenCalledWith('blob:test')
+
+      // Inspect the anchor that was created
+      const anchorCall = createElementSpy.mock.results.find(
+        (result) => (result.value as HTMLElement).tagName === 'A',
+      )
+      const anchor = anchorCall?.value as HTMLAnchorElement
+      expect(anchor.download).toBe('agorase-mockup-mockup-1-2026-05-16.png')
+      expect(anchor.href).toContain('blob:test')
+    })
+
+    it('falls back to a default filename when the header is missing', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(new Blob([Uint8Array.from([1])]), { status: 200 }),
+      )
+      vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test')
+      vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined)
+      const originalCreate = document.createElement.bind(document)
+      const createElementSpy = vi
+        .spyOn(document, 'createElement')
+        .mockImplementation((tag: string) => {
+          const element = originalCreate(tag) as HTMLAnchorElement
+          if (tag.toLowerCase() === 'a') {
+            element.click = vi.fn()
+          }
+          return element
+        })
+
+      await downloadMockupJob('mockup-1')
+
+      const anchorCall = createElementSpy.mock.results.find(
+        (result) => (result.value as HTMLElement).tagName === 'A',
+      )
+      const anchor = anchorCall?.value as HTMLAnchorElement
+      expect(anchor.download).toBe('agorase-mockup-mockup-1.png')
+    })
+
+    it('throws when the server returns an error', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 404 }))
+      await expect(downloadMockupJob('mockup-1')).rejects.toThrow('nope')
+    })
+  })
+
+  it('parses Content-Disposition filename header variants', () => {
+    expect(parseContentDispositionFilename('attachment; filename="hello.png"')).toBe('hello.png')
+    expect(parseContentDispositionFilename('attachment; filename=hello.png')).toBe('hello.png')
+    expect(parseContentDispositionFilename(null)).toBe('')
+    expect(parseContentDispositionFilename('inline')).toBe('')
   })
 })
