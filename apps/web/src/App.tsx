@@ -14,7 +14,7 @@ import { fashionOsModules, type FashionOsModule } from './fashionOs'
 import { listCreativeBriefs, listCreativeDirections } from './api/creativeApi'
 import { listLegalNotes } from './api/legalApi'
 import { listMockupJobs } from './api/mockupsApi'
-import { importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
+import { deletePartner, importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
 import { listProductionProfiles } from './api/productionApi'
 import { listReleases, listReleaseTasks } from './api/releasesApi'
 import { listTasks, saveTask } from './api/tasksApi'
@@ -54,7 +54,7 @@ function App() {
 
   const { authStatus, authError, handleLogin, handleLogout } = useAdminAuth()
   const [activeSection, setActiveSection] = useState<Section>('Command Center')
-  const [records, setRecords] = useState<Manufactory[]>(seedManufactories)
+  const [records, setRecords] = useState<Manufactory[]>([])
   const [recordsStatus, setRecordsStatus] = useState<RecordsStatus>('loading')
   const [recordsError, setRecordsError] = useState('')
   const [persistedTasks, setPersistedTasks] = useState<OperationalTask[]>([])
@@ -136,9 +136,8 @@ function App() {
       try {
         const loaded = await listPartners()
         if (!active) return
-        const nextRecords = loaded.length ? loaded : seedManufactories
-        setRecords(nextRecords)
-        setSelectedId((current) => current || nextRecords[0]?.id || '')
+        setRecords(loaded)
+        setSelectedId((current) => current || loaded[0]?.id || '')
         setRecordsStatus('ready')
         setRecordsError('')
         try {
@@ -181,7 +180,7 @@ function App() {
         }
       } catch (caught) {
         if (!active) return
-        setRecords(seedManufactories)
+        setRecords([])
         setRecordsError(caught instanceof Error ? caught.message : 'Partner konnten nicht geladen werden.')
         setRecordsStatus('error')
       }
@@ -218,6 +217,22 @@ function App() {
     } catch (caught) {
       setRecordsStatus('error')
       setRecordsError(caught instanceof Error ? caught.message : 'Partner konnte nicht aktualisiert werden.')
+    }
+  }
+
+  async function removeRecord(id: string) {
+    try {
+      await deletePartner(id)
+      setRecords((current) => {
+        const next = current.filter((record) => record.id !== id)
+        setSelectedId((currentId) => (currentId === id ? next[0]?.id ?? '' : currentId))
+        return next
+      })
+      setRecordsStatus('ready')
+      setRecordsError('')
+    } catch (caught) {
+      setRecordsStatus('error')
+      setRecordsError(caught instanceof Error ? caught.message : 'Partner konnte nicht gelöscht werden.')
     }
   }
 
@@ -303,6 +318,7 @@ function App() {
             onSelect={setSelectedId}
             onEdit={() => setFormOpen(true)}
             onPatch={updateSelectedRecord}
+            onDelete={removeRecord}
           />
         )}
         {activeSection === 'Production' && (

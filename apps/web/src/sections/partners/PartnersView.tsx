@@ -8,20 +8,30 @@ export function PartnersView({
   onSelect,
   onEdit,
   onPatch,
+  onDelete,
 }: {
   records: Manufactory[]
   selectedRecord?: Manufactory
   onSelect: (id: string) => void
   onEdit: () => void
   onPatch: (patch: Partial<Manufactory>) => void
+  onDelete: (id: string) => void
 }) {
   return (
     <section className="split-view">
       <div className="panel table-panel">
         <PanelHeader title="Fashion-Partner-Liste" />
-        <PartnerTable records={records} onSelect={onSelect} selectedId={selectedRecord?.id} />
+        {records.length === 0 ? (
+          <div className="empty-state">
+            Noch keine Partner. Über die Sourcing-Sektion neue Partner anlegen oder in den Einstellungen die Beispiel-Daten importieren.
+          </div>
+        ) : (
+          <PartnerTable records={records} onSelect={onSelect} selectedId={selectedRecord?.id} />
+        )}
       </div>
-      {selectedRecord && <DetailPanel record={selectedRecord} onEdit={onEdit} onPatch={onPatch} />}
+      {selectedRecord && (
+        <DetailPanel record={selectedRecord} onEdit={onEdit} onPatch={onPatch} onDelete={onDelete} />
+      )}
     </section>
   )
 }
@@ -30,11 +40,18 @@ function DetailPanel({
   record,
   onEdit,
   onPatch,
+  onDelete,
 }: {
   record: Manufactory
   onEdit: () => void
   onPatch: (patch: Partial<Manufactory>) => void
+  onDelete: (id: string) => void
 }) {
+  function handleDelete() {
+    if (window.confirm(`Partner "${record.name}" wirklich löschen?`)) {
+      onDelete(record.id)
+    }
+  }
   return (
     <aside className="detail-panel">
       <span className="label">Selected</span>
@@ -63,9 +80,14 @@ function DetailPanel({
         <input value={record.nextStep} onChange={(event) => onPatch({ nextStep: event.target.value })} />
       </label>
       <div className="note-box">{record.notes || 'Noch keine Notizen.'}</div>
-      <button type="button" onClick={onEdit}>
-        Datensatz bearbeiten
-      </button>
+      <div className="detail-actions">
+        <button type="button" onClick={onEdit}>
+          Datensatz bearbeiten
+        </button>
+        <button type="button" className="danger-button" onClick={handleDelete}>
+          Partner löschen
+        </button>
+      </div>
     </aside>
   )
 }

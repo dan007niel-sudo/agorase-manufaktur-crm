@@ -1607,3 +1607,21 @@ label {
   font-size: 12px;
   color: var(--muted);
 }
+
+.detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.danger-button {
+  background: #7b2d26;
+  color: #fff;
+  border-color: #7b2d26;
+}
+
+.danger-button:hover {
+  background: #5a1f1a;
+  border-color: #5a1f1a;
+}

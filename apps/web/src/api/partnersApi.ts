@@ -17,6 +17,7 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(message || `Request failed with status ${response.status}`)
   }
 
+  if (response.status === 204) return undefined as T
   return (await response.json()) as T
 }
 
@@ -39,6 +40,10 @@ export async function updatePartner(id: string, patch: Partial<Manufactory>) {
     body: JSON.stringify(patch),
   })
   return body.partner
+}
+
+export async function deletePartner(id: string) {
+  await requestJson<void>(`/api/partners/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 export async function importPartners(partners: Manufactory[]) {
