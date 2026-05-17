@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  LEGAL_COUNTRIES,
+  LEGAL_COUNTRY_LABELS,
   LEGAL_NOTE_STATUSES,
   LEGAL_RISK_LEVELS,
+  LEGAL_TEMPLATES,
   type FashionRelease,
   type LegalChecklistItem,
+  type LegalCountry,
   type LegalNote,
   type LegalNoteStatus,
   type LegalRiskLevel,
+  type LegalTemplate,
 } from '@agorase/shared'
 import {
   createLegalNote,
@@ -30,6 +35,8 @@ export function LegalView({ module }: { module: FashionOsModule }) {
   const [jurisdictionFilter, setJurisdictionFilter] = useState('Alle')
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
+  const [templateCountryFilter, setTemplateCountryFilter] = useState<LegalCountry | 'Alle'>('Alle')
 
   const jurisdictions = useMemo(() => {
     const set = new Set<string>()
@@ -87,6 +94,28 @@ export function LegalView({ module }: { module: FashionOsModule }) {
       setError(caught instanceof Error ? caught.message : 'Notiz konnte nicht erstellt werden.')
     }
   }
+
+  async function applyTemplate(template: LegalTemplate) {
+    const note = createLegalNoteFromTemplate(template)
+    try {
+      const saved = await createLegalNote(note)
+      setNotes((current) => upsertNote(current, saved))
+      setSelectedId(saved.id)
+      setTemplatePickerOpen(false)
+      setStatus('ready')
+      setError('')
+    } catch (caught) {
+      setStatus('error')
+      setError(
+        caught instanceof Error ? caught.message : 'Vorlage konnte nicht angewendet werden.',
+      )
+    }
+  }
+
+  const visibleTemplates = useMemo(() => {
+    if (templateCountryFilter === 'Alle') return LEGAL_TEMPLATES
+    return LEGAL_TEMPLATES.filter((template) => template.country === templateCountryFilter)
+  }, [templateCountryFilter])
 
   async function patchNote(patch: Partial<LegalNote>) {
     if (!selectedNote) return
@@ -147,6 +176,65 @@ export function LegalView({ module }: { module: FashionOsModule }) {
     <section className="legal-layout">
       <aside className="legal-list panel">
         <PanelHeader title="Legal" action="Neue Notiz" onClick={() => void addNote()} />
+        <button
+          type="button"
+          className="legal-template-toggle"
+          onClick={() => setTemplatePickerOpen((open) => !open)}
+          aria-expanded={templatePickerOpen}
+        >
+          {templatePickerOpen ? 'Vorlagen-Auswahl schließen' : 'Aus Vorlage anlegen'}
+        </button>
+        {templatePickerOpen && (
+          <div className="legal-template-picker">
+            <p className="legal-template-notice">
+              Templates sind Startpunkte für die Recherche, keine Rechtsberatung. Inhalte und Quellen
+              können sich jederzeit ändern — vor verbindlichem Einsatz immer mit qualifizierter
+              Beratung abgleichen.
+            </p>
+            <div className="legal-template-filters" role="group" aria-label="Land filtern">
+              <button
+                type="button"
+                className={templateCountryFilter === 'Alle' ? 'chip selected' : 'chip'}
+                onClick={() => setTemplateCountryFilter('Alle')}
+              >
+                Alle
+              </button>
+              {LEGAL_COUNTRIES.map((country) => (
+                <button
+                  type="button"
+                  key={country}
+                  className={templateCountryFilter === country ? 'chip selected' : 'chip'}
+                  onClick={() => setTemplateCountryFilter(country)}
+                >
+                  {country} · {LEGAL_COUNTRY_LABELS[country]}
+                </button>
+              ))}
+            </div>
+            {!visibleTemplates.length && (
+              <div className="empty-state">Keine Vorlagen für diese Auswahl.</div>
+            )}
+            {visibleTemplates.map((template) => (
+              <div className="legal-template-row" key={template.id}>
+                <div className="legal-template-meta">
+                  <strong>{template.title}</strong>
+                  <span>
+                    {template.country} · {template.topic} · {template.defaultRiskLevel}
+                  </span>
+                </div>
+                <button type="button" onClick={() => void applyTemplate(template)}>
+                  Anwenden
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="legal-template-close"
+              onClick={() => setTemplatePickerOpen(false)}
+            >
+              Schließen
+            </button>
+          </div>
+        )}
         <p className="legal-disclaimer">
           <strong>Hinweis:</strong> Diese Sektion ist eine operative Organisation für rechtliche Aufgaben.
           Sie ersetzt <strong>keine Rechtsberatung</strong>. Verbindliche Auskünfte nur durch qualifizierte
@@ -282,7 +370,15 @@ function LegalEditor({
             value={note.jurisdiction}
             onChange={(event) => onChange({ jurisdiction: event.target.value })}
             placeholder="DE, EU, US-CA"
+            list="legal-jurisdiction-suggestions"
           />
+          <datalist id="legal-jurisdiction-suggestions">
+            {LEGAL_COUNTRIES.map((country) => (
+              <option key={country} value={country}>
+                {LEGAL_COUNTRY_LABELS[country]}
+              </option>
+            ))}
+          </datalist>
         </label>
       </div>
       <div className="form-grid two">
@@ -406,6 +502,35 @@ function LegalChecklistEditor({
       ))}
     </div>
   )
+}
+
+function createLegalNoteFromTemplate(template: LegalTemplate): LegalNote {
+  const now = new Date().toISOString()
+  const stamp = Date.now()
+  return {
+    id: `legal-${stamp}`,
+    title: template.title,
+    topic: template.topic,
+    jurisdiction: template.country,
+    riskLevel: template.defaultRiskLevel,
+    status: template.defaultStatus,
+    summary: template.summary,
+    body: template.body,
+    checklist: template.checklist.map((label, index) => ({
+      id: `c-${stamp}-${index}`,
+      label,
+      done: false,
+    })),
+    sourceLinks: template.sourceLinks.join('\n'),
+    nextAction: template.defaultNextAction,
+    nextActionDue: '',
+    responsible: '',
+    releaseId: '',
+    partnerId: '',
+    notes: '',
+    createdAt: now,
+    updatedAt: now,
+  }
 }
 
 function createEmptyLegalNote(): LegalNote {
