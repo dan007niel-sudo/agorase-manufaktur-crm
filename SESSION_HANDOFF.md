@@ -43,12 +43,13 @@ As of the last update:
 - Remote: `origin`
 - Local `main` was clean and in sync with `origin/main`
 - Latest pushed app commit:
-  - `32e3420 feat: allow partner delete and stop seeding empty databases`
-- Phase 3 was declared completion-ready in `fbb5fcc`. Four follow-up
+  - `4a5db49 feat: reorder mockup reference images via arrow buttons`
+- Phase 3 was declared completion-ready in `fbb5fcc`. Five follow-up
   Phase-4 enhancements have shipped on top of it.
 
 Recent important commits (newest first):
 
+- `4a5db49 feat: reorder mockup reference images via arrow buttons` (Phase 4E)
 - `32e3420 feat: allow partner delete and stop seeding empty databases` (Phase 4D)
 - `12a9ff4 feat: add DACH legal templates for DE/AT/CH` (Phase 4C)
 - `9cdbd77 fix: add visible feedback to chip and card interactions` (Phase 4B)
@@ -113,6 +114,7 @@ Phase 4 enhancements (shipped on top of the completion baseline) are live:
 - Phase 4B Button Feedback Polish is LIVE: `.chip.selected` rule (was missing entirely), `.chip:hover` / `.chip:active` / `.chip:focus-visible`, and consistent hover/active/focus styling for all selectable cards (web-ops, releases, creative lab, legal). Pure CSS, no logic changes.
 - Phase 4C DACH Legal Templates is LIVE: 18 curated legal templates (6 × DE / 6 × AT / 6 × CH) covering Impressum, Datenschutz, AGB, Widerruf/Rücktritt/Rücknahme, Verpackungsregister, Markenregistrierung. Hardcoded in `packages/shared/src/legalTemplates.ts` (no DB table). LegalView has a new "Aus Vorlage anlegen" picker with country chip filter, jurisdiction `<datalist>` (DE/AT/CH/EU), and a visible "Templates sind Startpunkte, keine Rechtsberatung" disclaimer.
 - Phase 4D Partner Delete & Fresh-Start UX is LIVE: `deletePartner` web client added (DELETE endpoint already existed server-side), red "Partner löschen" button with `window.confirm` in PartnersView, empty-state message when no records exist, and the seed auto-fallback in App.tsx was removed so an empty database stays empty. The "Seed neu importieren" button in Settings remains as opt-in.
+- Phase 4E Mockup Reference Reordering is LIVE: per-reference ↑/↓ arrow buttons in MockupsView reorder the up to 3 reference images on a mockup job via an immutable swap helper. End buttons are disabled at the array boundaries. Pure web change — backend, API, and shared contracts are unchanged, and no migration was needed.
 
 ## Important Files
 
@@ -397,7 +399,6 @@ If more work follows, candidates raised during the Phase-4 sessions:
 - Delete affordances in the other sections (Releases, Web Ops cards do
   not yet have a delete button, only the explicit detail-view delete in
   Mockups, Creative Lab, Legal, Partners).
-- Reference image reordering / drag-and-drop in Mockups.
 - Per-reference rejection feedback when Gemini fails a single image.
 - Image proxy / DAM for larger mockup outputs and reference assets.
 
