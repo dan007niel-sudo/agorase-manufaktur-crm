@@ -205,6 +205,20 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
     )
   }
 
+  function moveReference(id: string, direction: -1 | 1) {
+    setReferences((current) => {
+      const index = current.findIndex((ref) => ref.id === id)
+      if (index === -1) return current
+      const targetIndex = index + direction
+      if (targetIndex < 0 || targetIndex >= current.length) return current
+      const next = current.slice()
+      const tmp = next[index]
+      next[index] = next[targetIndex]
+      next[targetIndex] = tmp
+      return next
+    })
+  }
+
   return (
     <section className="creative-lab-layout">
       <aside className="creative-lab-workspace panel">
@@ -234,7 +248,7 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
           <div className="mockup-references">
             <span className="field-label">Referenzbilder ({references.length}/{MOCKUP_MAX_REFERENCES})</span>
             <div className="mockup-reference-grid">
-              {references.map((ref) => (
+              {references.map((ref, index) => (
                 <div key={ref.id} className="mockup-reference-slot filled">
                   <img
                     src={`data:${ref.mimeType};base64,${ref.data}`}
@@ -258,6 +272,20 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
                         ))}
                       </select>
                     </label>
+                    <div className="mockup-reference-order">
+                      <button
+                        type="button"
+                        aria-label="Referenz nach oben verschieben"
+                        disabled={index === 0}
+                        onClick={() => moveReference(ref.id, -1)}
+                      >↑</button>
+                      <button
+                        type="button"
+                        aria-label="Referenz nach unten verschieben"
+                        disabled={index === references.length - 1}
+                        onClick={() => moveReference(ref.id, 1)}
+                      >↓</button>
+                    </div>
                     <button
                       type="button"
                       className="mockup-reference-remove"

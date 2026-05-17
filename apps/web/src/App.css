@@ -1276,6 +1276,46 @@ label {
   cursor: pointer;
 }
 
+.mockup-reference-order {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.mockup-reference-order button {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid #d6cfbb;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+}
+
+.mockup-reference-order button:hover:not(:disabled) {
+  border-color: var(--ink);
+  background: #f4efe4;
+}
+
+.mockup-reference-order button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.mockup-reference-order button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.mockup-reference-order button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .mockup-reference-strip {
   display: flex;
   gap: 4px;
