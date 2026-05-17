@@ -1,6 +1,6 @@
 # Session Handoff
 
-Last updated: 2026-05-16
+Last updated: 2026-05-17
 
 ## Purpose
 
@@ -43,25 +43,26 @@ As of the last update:
 - Remote: `origin`
 - Local `main` was clean and in sync with `origin/main`
 - Latest pushed app commit:
-  - `4722be5 feat: add admin data tools`
-- All six remaining Phase-3 sub-phases (3H, 3D, 3E, 3F, 3I, 3J) are now
-  live. Phase 3J adds polish only — no behavior changes — and is the
-  final completion phase.
+  - `32e3420 feat: allow partner delete and stop seeding empty databases`
+- Phase 3 was declared completion-ready in `fbb5fcc`. Four follow-up
+  Phase-4 enhancements have shipped on top of it.
 
-Recent important commits:
+Recent important commits (newest first):
 
-- `4722be5 feat: add admin data tools`
-- `438f74f feat: build legal orientation workspace`
-- `979dbc4 feat: build mockup generation workspace`
-- `d6b03a8 feat: build creative lab`
-- `0cb8a98 feat: build web ops workspace`
-- `26e9712 feat: build release planning workspace`
-- `d4f5382 feat: build production workspace`
-- `6373e14 feat: add persistent operational records`
-- `d73dd8d refactor: split web app shell and sections`
-- `03f744a feat: gate web app behind admin login`
-- `4f0e2e2 feat: sync partners through api`
-- `1598023 fix: load migrations from built api`
+- `32e3420 feat: allow partner delete and stop seeding empty databases` (Phase 4D)
+- `12a9ff4 feat: add DACH legal templates for DE/AT/CH` (Phase 4C)
+- `9cdbd77 fix: add visible feedback to chip and card interactions` (Phase 4B)
+- `3f3ec27 feat: support reference uploads and downloads in mockups` (Phase 4A)
+- `fbb5fcc docs: mark completion readiness` (Phase 3J)
+- `4722be5 feat: add admin data tools` (Phase 3I)
+- `438f74f feat: build legal orientation workspace` (Phase 3F)
+- `979dbc4 feat: build mockup generation workspace` (Phase 3E)
+- `d6b03a8 feat: build creative lab` (Phase 3D)
+- `0cb8a98 feat: build web ops workspace` (Phase 3H)
+- `26e9712 feat: build release planning workspace` (Phase 3G)
+- `d4f5382 feat: build production workspace` (Phase 3C)
+- `6373e14 feat: add persistent operational records` (Phase 3B)
+- `d73dd8d refactor: split web app shell and sections` (Phase 3A)
 
 ## Current Product State
 
@@ -105,6 +106,13 @@ admin workspace served by an auth-protected API:
 - Phase 3J Polish is DONE: orphan code removed, sidebar status flipped to active across the board, brainstorm error code renamed to `_not_configured`, aria-pressed added to chip toggles, English aria-labels rewritten to German, destructive deletes confirmed.
 
 All previously planned placeholder areas are DONE.
+
+Phase 4 enhancements (shipped on top of the completion baseline) are live:
+
+- Phase 4A Mockup References & Download is LIVE: up to 3 reference images per job (PNG/JPEG/WebP, max 2 MB each) persisted as `reference_images jsonb` on `mockup_jobs`; `POST /api/mockups/generate` builds a multimodal Gemini request with the references; new `GET /api/mockups/:id/download` proxies the result image with a safe `Content-Disposition` filename. Fixed a latent bug in the Node HTTP adapter where `outgoing.end(await response.text())` corrupted binary bodies; now uses `Buffer.from(await response.arrayBuffer())`.
+- Phase 4B Button Feedback Polish is LIVE: `.chip.selected` rule (was missing entirely), `.chip:hover` / `.chip:active` / `.chip:focus-visible`, and consistent hover/active/focus styling for all selectable cards (web-ops, releases, creative lab, legal). Pure CSS, no logic changes.
+- Phase 4C DACH Legal Templates is LIVE: 18 curated legal templates (6 × DE / 6 × AT / 6 × CH) covering Impressum, Datenschutz, AGB, Widerruf/Rücktritt/Rücknahme, Verpackungsregister, Markenregistrierung. Hardcoded in `packages/shared/src/legalTemplates.ts` (no DB table). LegalView has a new "Aus Vorlage anlegen" picker with country chip filter, jurisdiction `<datalist>` (DE/AT/CH/EU), and a visible "Templates sind Startpunkte, keine Rechtsberatung" disclaimer.
+- Phase 4D Partner Delete & Fresh-Start UX is LIVE: `deletePartner` web client added (DELETE endpoint already existed server-side), red "Partner löschen" button with `window.confirm` in PartnersView, empty-state message when no records exist, and the seed auto-fallback in App.tsx was removed so an empty database stays empty. The "Seed neu importieren" button in Settings remains as opt-in.
 
 ## Important Files
 
@@ -363,6 +371,35 @@ private admin operating system. After Phase 3J ships:
   / `<feature>_failed` naming pattern.
 
 The app is ready for daily admin use. There is no pending Phase-3 work.
+
+### Open manual step (Phase 4D follow-up)
+
+The six original seed partner records imported during Phase 2A
+(`Atelier Stoffwerk Berlin`, `Confezione Lago` etc.) are still in the
+live Render Postgres. To start with a clean CRM:
+
+1. Log in at https://agorase-fashion-os-web.onrender.com
+2. Sidebar → Partners
+3. For each seed entry: select the row → click the red **"Partner
+   löschen"** button in the detail panel → confirm.
+4. After the last one, the empty-state message replaces the table.
+
+The "Seed neu importieren"-Button in Settings can re-seed at any time
+if the user wants the demo data back. Phase 4D removed the automatic
+seed-fallback in `App.tsx`, so empty databases now stay empty.
+
+### Possible next-phase ideas (post-4D)
+
+If more work follows, candidates raised during the Phase-4 sessions:
+
+- Additional DACH legal templates (Textilkennzeichnungsverordnung,
+  Lieferkettengesetz LkSG, Influencer Marketing UWG, Designschutz)
+- Delete affordances in the other sections (Releases, Web Ops cards do
+  not yet have a delete button, only the explicit detail-view delete in
+  Mockups, Creative Lab, Legal, Partners).
+- Reference image reordering / drag-and-drop in Mockups.
+- Per-reference rejection feedback when Gemini fails a single image.
+- Image proxy / DAM for larger mockup outputs and reference assets.
 
 ### Possible future work
 
