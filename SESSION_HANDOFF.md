@@ -49,6 +49,7 @@ As of the last update:
 
 Recent important commits (newest first):
 
+- `a436ee5 feat: replace mobile scroll tab strip with off-canvas drawer` (Phase 4H)
 - `e93cd66 feat: polish sidebar, topbar, and section copy for clarity` (Phase 4G)
 - `2f72f52 feat: proxy /api same-origin through render web service` (Phase 4F)
 - `4a5db49 feat: reorder mockup reference images via arrow buttons` (Phase 4E)
@@ -119,6 +120,7 @@ Phase 4 enhancements (shipped on top of the completion baseline) are live:
 - Phase 4E Mockup Reference Reordering is LIVE: per-reference ↑/↓ arrow buttons in MockupsView reorder the up to 3 reference images on a mockup job via an immutable swap helper. End buttons are disabled at the array boundaries. Pure web change — backend, API, and shared contracts are unchanged, and no migration was needed.
 - Phase 4F Same-Origin-Proxy ist LIVE: Render-Static-Site rewrite `/api/*` → `https://agorase-fashion-os-api.onrender.com/api/*` vor dem SPA-Fallback. Frontend nutzt jetzt relative `/api/...`-Pfade (alle 13 API-Module fallen via `VITE_API_BASE_URL || ''` auf relative Pfade zurück). Effekt: iOS-Browser (WebKit) sehen alle Requests als first-party und schicken den Session-Cookie wieder mit. Behebt die "Partnerdaten konnten nicht synchronisiert werden / Authentication required."-Symptome auf iOS Safari/Chrome.
 - Phase 4G UI Clarity Polish ist LIVE: Sidebar-ACTIVE-Badges entfernt (alle Sektionen sind live, das Badge war redundant), Breadcrumb zeigt jetzt den aktuellen Sektionsnamen, Top-Bar mit Suche/Kategorie/Status/Neuer-Kontakt nur noch in Command Center, Sourcing und Partners (vorher in allen 10 Sektionen — auch Settings/Mockups, wo es keinen Sinn ergab). Dropdowns haben sichtbare Labels ("Suche", "Kategorie", "Status"). Alle 10 Section-Descriptions wurden ins Deutsche übersetzt. Settings: "Phase 2A" → "Daten-Synchronisation", "Seed speichern" → "Demo-Daten importieren". Neue CSS-Klasse `.destructive-button` / `.danger-button` (#b42318) macht den "Partner löschen"-Button als destruktive Aktion erkennbar.
+- Phase 4H Mobile Off-Canvas-Drawer ist LIVE: Unter 980px Viewport wird die Sidebar zum Off-Canvas-Drawer. Hamburger-Button (☰) in einer neuen `.mobile-header`-Leiste öffnet den Drawer per Slide-in von links; Backdrop verdunkelt den Hintergrund. Schließt auf Escape, Backdrop-Click, Section-Auswahl, sowie auf Resize zu Desktop (≥ 981px). Body-Scroll ist gelocked solange der Drawer offen ist. ARIA-Wiring: `aria-expanded`, `aria-controls="primary-navigation"`, dynamisches `aria-label`. Ersetzt den vorherigen Sticky-Top-Horizontal-Scroll-Tab-Strip, der auf iOS nur ~7 von 10 Sektionen sichtbar machte.
 
 ## Important Files
 
@@ -256,6 +258,10 @@ Phase 4F lessons:
 Phase 4G lessons:
 
 - **Status-Marker, die nach einem Rollout obsolet werden, müssen aktiv entfernt werden.** Das in Phase 3J eingeführte "ACTIVE"-Sidebar-Badge war ein nützlicher Live-Status-Indikator solange manche Sektionen noch im Aufbau waren. Nachdem in Phase 3J–Phase 4F alles aktiv wurde, war das Badge zu 100% Redundanz und visuelles Rauschen. Lesson: bei Übergangs-UI-Indikatoren (Status-Badges, "Coming Soon"-Marker, "Beta"-Pills) sofort eine Issue/TODO anlegen, die nach Abschluss der Migration wieder entfernt wird.
+
+Phase 4H lessons:
+
+- **Default-Mobile-Sticky-Strips skalieren nicht über 6-7 Items.** Phase 3J–4F vergrößerten die Sidebar von 6 auf 10 Sektionen. Mit den ACTIVE-Badges passten unter 980px nur ~7 sichtbar, horizontal scrollen wurde notwendig. Lesson: wenn eine Mobile-Nav-Liste >6-7 Items hat oder wachsen kann, von Anfang an mit einem Off-Canvas-Drawer oder Bottom-Sheet planen — nicht mit horizontalem Scroll.
 
 ## Existing Worktrees
 
@@ -414,7 +420,6 @@ If more work follows, candidates raised during the Phase-4 sessions:
 - Per-reference rejection feedback when Gemini fails a single image.
 - Image proxy / DAM for larger mockup outputs and reference assets.
 - Mockups: leere Verlauf/Detail-Spalten kollabieren, sodass die Form mehr Platz bekommt.
-- Mobile-Navigation als Off-Canvas-Drawer statt horizontalem Scroll-Tab-Strip.
 
 ### Possible future work
 
