@@ -49,6 +49,7 @@ As of the last update:
 
 Recent important commits (newest first):
 
+- `e93cd66 feat: polish sidebar, topbar, and section copy for clarity` (Phase 4G)
 - `2f72f52 feat: proxy /api same-origin through render web service` (Phase 4F)
 - `4a5db49 feat: reorder mockup reference images via arrow buttons` (Phase 4E)
 - `32e3420 feat: allow partner delete and stop seeding empty databases` (Phase 4D)
@@ -117,6 +118,7 @@ Phase 4 enhancements (shipped on top of the completion baseline) are live:
 - Phase 4D Partner Delete & Fresh-Start UX is LIVE: `deletePartner` web client added (DELETE endpoint already existed server-side), red "Partner löschen" button with `window.confirm` in PartnersView, empty-state message when no records exist, and the seed auto-fallback in App.tsx was removed so an empty database stays empty. The "Seed neu importieren" button in Settings remains as opt-in.
 - Phase 4E Mockup Reference Reordering is LIVE: per-reference ↑/↓ arrow buttons in MockupsView reorder the up to 3 reference images on a mockup job via an immutable swap helper. End buttons are disabled at the array boundaries. Pure web change — backend, API, and shared contracts are unchanged, and no migration was needed.
 - Phase 4F Same-Origin-Proxy ist LIVE: Render-Static-Site rewrite `/api/*` → `https://agorase-fashion-os-api.onrender.com/api/*` vor dem SPA-Fallback. Frontend nutzt jetzt relative `/api/...`-Pfade (alle 13 API-Module fallen via `VITE_API_BASE_URL || ''` auf relative Pfade zurück). Effekt: iOS-Browser (WebKit) sehen alle Requests als first-party und schicken den Session-Cookie wieder mit. Behebt die "Partnerdaten konnten nicht synchronisiert werden / Authentication required."-Symptome auf iOS Safari/Chrome.
+- Phase 4G UI Clarity Polish ist LIVE: Sidebar-ACTIVE-Badges entfernt (alle Sektionen sind live, das Badge war redundant), Breadcrumb zeigt jetzt den aktuellen Sektionsnamen, Top-Bar mit Suche/Kategorie/Status/Neuer-Kontakt nur noch in Command Center, Sourcing und Partners (vorher in allen 10 Sektionen — auch Settings/Mockups, wo es keinen Sinn ergab). Dropdowns haben sichtbare Labels ("Suche", "Kategorie", "Status"). Alle 10 Section-Descriptions wurden ins Deutsche übersetzt. Settings: "Phase 2A" → "Daten-Synchronisation", "Seed speichern" → "Demo-Daten importieren". Neue CSS-Klasse `.destructive-button` / `.danger-button` (#b42318) macht den "Partner löschen"-Button als destruktive Aktion erkennbar.
 
 ## Important Files
 
@@ -250,6 +252,10 @@ Phase 3G deployment:
 Phase 4F lessons:
 
 - **iOS-WebKit blockt Cross-Site-Cookies aggressiv.** Selbst mit `HttpOnly; Secure; SameSite=None` und korrektem `Access-Control-Allow-Credentials: true` werden Cookies auf iOS-Safari/Chrome bei jedem Cross-Origin-Request stillschweigend nicht mitgeschickt. Fix: same-origin Setup via Render-Static-Site-Rewrite, sodass `/api/*` über den Web-Origin proxiert wird. Manueller Folgeschritt nötig: `VITE_API_BASE_URL` im Render-Dashboard für den Web-Service löschen, damit der yaml-Default greift und das Web-Bundle relative Pfade einbettet.
+
+Phase 4G lessons:
+
+- **Status-Marker, die nach einem Rollout obsolet werden, müssen aktiv entfernt werden.** Das in Phase 3J eingeführte "ACTIVE"-Sidebar-Badge war ein nützlicher Live-Status-Indikator solange manche Sektionen noch im Aufbau waren. Nachdem in Phase 3J–Phase 4F alles aktiv wurde, war das Badge zu 100% Redundanz und visuelles Rauschen. Lesson: bei Übergangs-UI-Indikatoren (Status-Badges, "Coming Soon"-Marker, "Beta"-Pills) sofort eine Issue/TODO anlegen, die nach Abschluss der Migration wieder entfernt wird.
 
 ## Existing Worktrees
 
@@ -407,6 +413,8 @@ If more work follows, candidates raised during the Phase-4 sessions:
   Mockups, Creative Lab, Legal, Partners).
 - Per-reference rejection feedback when Gemini fails a single image.
 - Image proxy / DAM for larger mockup outputs and reference assets.
+- Mockups: leere Verlauf/Detail-Spalten kollabieren, sodass die Form mehr Platz bekommt.
+- Mobile-Navigation als Off-Canvas-Drawer statt horizontalem Scroll-Tab-Strip.
 
 ### Possible future work
 
