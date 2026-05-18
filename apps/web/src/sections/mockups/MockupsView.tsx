@@ -219,8 +219,13 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
     })
   }
 
+  const hasJobs = sortedJobs.length > 0
+  const layoutClassName = hasJobs
+    ? 'creative-lab-layout'
+    : 'creative-lab-layout mockups-layout--solo'
+
   return (
-    <section className="creative-lab-layout">
+    <section className={layoutClassName}>
       <aside className="creative-lab-workspace panel">
         <PanelHeader title={module.label} />
         {loadStatus === 'loading' && <div className="empty-state">Mockups werden geladen.</div>}
@@ -384,60 +389,63 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
         </div>
       </aside>
 
-      <aside className="creative-lab-list panel">
-        <PanelHeader title="Verlauf" />
-        {!sortedJobs.length && <div className="empty-state">Noch keine Mockups generiert.</div>}
-        {sortedJobs.map((job) => (
-          <div
-            key={job.id}
-            className={job.id === selectedJob?.id ? 'creative-lab-card selected' : 'creative-lab-card'}
-          >
-            <button
-              type="button"
-              className="creative-lab-card-body"
-              onClick={() => setSelectedJobId(job.id)}
+      {hasJobs && (
+        <aside className="creative-lab-list panel">
+          <PanelHeader title="Verlauf" />
+          {sortedJobs.map((job) => (
+            <div
+              key={job.id}
+              className={job.id === selectedJob?.id ? 'creative-lab-card selected' : 'creative-lab-card'}
             >
-              <strong>{job.prompt.slice(0, 80) || 'Ohne Prompt'}</strong>
-              <span>{STATUS_LABELS[job.status]}</span>
-              <small>{`${job.aspectRatio} · ${QUALITY_LABELS[job.quality]}`}</small>
-              {job.referenceImages.length > 0 && (
-                <div className="mockup-reference-strip">
-                  {job.referenceImages.slice(0, MOCKUP_MAX_REFERENCES).map((ref) => (
-                    <img
-                      key={ref.id}
-                      src={`data:${ref.mimeType};base64,${ref.data}`}
-                      alt={ref.name}
-                      className="mockup-reference-strip-thumb"
-                    />
-                  ))}
-                </div>
-              )}
-            </button>
-            {job.status === 'completed' && (
               <button
                 type="button"
-                className="mockup-download-button"
-                onClick={() => void downloadJob(job.id)}
+                className="creative-lab-card-body"
+                onClick={() => setSelectedJobId(job.id)}
               >
-                Download
+                <strong>{job.prompt.slice(0, 80) || 'Ohne Prompt'}</strong>
+                <span>{STATUS_LABELS[job.status]}</span>
+                <small>{`${job.aspectRatio} · ${QUALITY_LABELS[job.quality]}`}</small>
+                {job.referenceImages.length > 0 && (
+                  <div className="mockup-reference-strip">
+                    {job.referenceImages.slice(0, MOCKUP_MAX_REFERENCES).map((ref) => (
+                      <img
+                        key={ref.id}
+                        src={`data:${ref.mimeType};base64,${ref.data}`}
+                        alt={ref.name}
+                        className="mockup-reference-strip-thumb"
+                      />
+                    ))}
+                  </div>
+                )}
               </button>
-            )}
-          </div>
-        ))}
-      </aside>
+              {job.status === 'completed' && (
+                <button
+                  type="button"
+                  className="mockup-download-button"
+                  onClick={() => void downloadJob(job.id)}
+                >
+                  Download
+                </button>
+              )}
+            </div>
+          ))}
+        </aside>
+      )}
 
-      <section className="creative-lab-directions panel">
-        <PanelHeader title="Detail" />
-        {selectedJob ? (
-          <MockupDetail
-            job={selectedJob}
-            onDelete={() => void removeJob(selectedJob.id)}
-            onDownload={() => void downloadJob(selectedJob.id)}
-          />
-        ) : (
-          <div className="empty-state">Wähle ein Mockup aus dem Verlauf.</div>
-        )}
-      </section>
+      {hasJobs && (
+        <section className="creative-lab-directions panel">
+          <PanelHeader title="Detail" />
+          {selectedJob ? (
+            <MockupDetail
+              job={selectedJob}
+              onDelete={() => void removeJob(selectedJob.id)}
+              onDownload={() => void downloadJob(selectedJob.id)}
+            />
+          ) : (
+            <div className="empty-state">Wähle ein Mockup aus dem Verlauf.</div>
+          )}
+        </section>
+      )}
     </section>
   )
 }

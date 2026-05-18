@@ -1199,6 +1199,16 @@ label {
   align-items: start;
 }
 
+.creative-lab-layout.mockups-layout--solo {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.creative-lab-layout.mockups-layout--solo .creative-lab-workspace {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+
 .creative-lab-list,
 .creative-lab-workspace,
 .creative-lab-directions {

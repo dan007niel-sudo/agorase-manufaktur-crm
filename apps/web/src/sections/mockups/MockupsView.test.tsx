@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { MockupJob } from '@agorase/shared'
+
+const listMockupJobsMock = vi.fn(async (): Promise<MockupJob[]> => [])
 
 vi.mock('../../api/mockupsApi', () => ({
-  listMockupJobs: vi.fn(async () => []),
+  listMockupJobs: (...args: unknown[]) => listMockupJobsMock(...(args as [])),
   deleteMockupJob: vi.fn(async () => undefined),
   downloadMockupJob: vi.fn(async () => undefined),
   generateMockup: vi.fn(),
@@ -56,6 +59,57 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks()
+})
+
+function makeJob(overrides: Partial<MockupJob> = {}): MockupJob {
+  return {
+    id: 'job-1',
+    prompt: 'A simple prompt',
+    referenceNotes: '',
+    aspectRatio: '1:1',
+    quality: 'standard',
+    status: 'completed',
+    modelUsed: 'gemini',
+    imageUrl: '',
+    imageData: '',
+    mimeType: 'image/png',
+    error: '',
+    releaseId: '',
+    briefId: '',
+    notes: '',
+    referenceImages: [],
+    createdAt: '2026-05-15T10:00:00.000Z',
+    updatedAt: '2026-05-15T10:00:00.000Z',
+    ...overrides,
+  }
+}
+
+describe('MockupsView layout collapse on empty history', () => {
+  it('renders only the workspace column when no jobs exist', async () => {
+    listMockupJobsMock.mockResolvedValueOnce([])
+    render(<MockupsView module={mockupsModule} />)
+
+    await waitFor(() => {
+      expect(document.querySelector('.creative-lab-workspace')).not.toBeNull()
+    })
+
+    expect(document.querySelector('.creative-lab-list')).toBeNull()
+    expect(document.querySelector('.creative-lab-directions')).toBeNull()
+    expect(document.querySelector('.creative-lab-layout.mockups-layout--solo')).not.toBeNull()
+  })
+
+  it('renders the three-column layout when at least one job exists', async () => {
+    listMockupJobsMock.mockResolvedValueOnce([makeJob()])
+    render(<MockupsView module={mockupsModule} />)
+
+    await waitFor(() => {
+      expect(document.querySelector('.creative-lab-list')).not.toBeNull()
+    })
+
+    expect(document.querySelector('.creative-lab-workspace')).not.toBeNull()
+    expect(document.querySelector('.creative-lab-directions')).not.toBeNull()
+    expect(document.querySelector('.creative-lab-layout.mockups-layout--solo')).toBeNull()
+  })
 })
 
 describe('MockupsView reference reordering', () => {
