@@ -67,11 +67,11 @@ export function SettingsView({
     <section className="panel">
       <PanelHeader title="Settings" />
       <div className="foundation-panel">
-        <span className="label">Phase 2A</span>
+        <span className="label">Daten-Synchronisation</span>
         <p>{status}</p>
         <div className="settings-actions">
           <button type="button" className="primary-button" onClick={onSeedSave}>
-            Seed speichern
+            Demo-Daten importieren
           </button>
           <button type="button" onClick={onLogout}>
             Logout

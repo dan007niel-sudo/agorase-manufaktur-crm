@@ -127,6 +127,8 @@ function App() {
     .concat(createLegalCommandTasks(legalNotes, persistedTasksById, today))
   const openTaskCount = tasks.filter((task) => !task.completed).length
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
+  const filterSections: Section[] = ['Command Center', 'Sourcing', 'Partners']
+  const filtersVisible = filterSections.includes(activeSection)
 
   useEffect(() => {
     if (authStatus !== 'authenticated') return
@@ -288,6 +290,7 @@ function App() {
         query={query}
         categoryFilter={categoryFilter}
         statusFilter={statusFilter}
+        filtersVisible={filtersVisible}
         onSectionChange={setActiveSection}
         onQueryChange={setQuery}
         onCategoryChange={setCategoryFilter}

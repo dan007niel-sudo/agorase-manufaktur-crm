@@ -203,19 +203,47 @@ h2 {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  align-items: end;
   min-width: 0;
 }
 
 .topbar-actions input {
-  flex: 1 1 240px;
+  width: 100%;
 }
 
 .topbar-actions select {
-  flex: 0 1 150px;
+  width: 100%;
 }
 
 .topbar-actions .primary-button {
   flex: 0 0 auto;
+}
+
+.topbar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.topbar-field:nth-child(1) {
+  flex: 1 1 240px;
+}
+
+.topbar-field:nth-child(2),
+.topbar-field:nth-child(3) {
+  flex: 0 1 150px;
+}
+
+.field-label {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.topbar--solo {
+  grid-template-columns: 1fr;
 }
 
 input,
@@ -1655,13 +1683,29 @@ label {
   margin-top: 4px;
 }
 
-.danger-button {
-  background: #7b2d26;
-  color: #fff;
-  border-color: #7b2d26;
+.danger-button,
+.detail-panel .danger-button,
+.destructive-button,
+.detail-panel .destructive-button {
+  justify-self: start;
+  background: transparent;
+  color: #b42318;
+  border: 1px solid #b42318;
+  border-bottom: 1px solid #b42318;
+  border-radius: 4px;
+  padding: 6px 10px;
 }
 
-.danger-button:hover {
-  background: #5a1f1a;
-  border-color: #5a1f1a;
+.danger-button:hover,
+.danger-button:focus,
+.detail-panel .danger-button:hover,
+.detail-panel .danger-button:focus,
+.destructive-button:hover,
+.destructive-button:focus,
+.detail-panel .destructive-button:hover,
+.detail-panel .destructive-button:focus {
+  background: #b42318;
+  color: #fff;
+  border-color: #b42318;
+  outline: none;
 }

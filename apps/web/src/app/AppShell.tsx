@@ -13,6 +13,7 @@ export function AppShell({
   categoryFilter,
   statusFilter,
   alert,
+  filtersVisible,
   onSectionChange,
   onQueryChange,
   onCategoryChange,
@@ -27,6 +28,7 @@ export function AppShell({
   categoryFilter: 'Alle' | Category
   statusFilter: 'Alle' | PipelineStatus
   alert?: string
+  filtersVisible: boolean
   onSectionChange: (section: Section) => void
   onQueryChange: (value: string) => void
   onCategoryChange: (value: 'Alle' | Category) => void
@@ -43,6 +45,7 @@ export function AppShell({
           query={query}
           categoryFilter={categoryFilter}
           statusFilter={statusFilter}
+          filtersVisible={filtersVisible}
           onQueryChange={onQueryChange}
           onCategoryChange={onCategoryChange}
           onStatusChange={onStatusChange}
@@ -79,10 +82,10 @@ function Sidebar({
             key={module.section}
             className={activeSection === module.section ? 'active' : ''}
             type="button"
+            aria-current={activeSection === module.section ? 'page' : undefined}
             onClick={() => onSelect(module.section)}
           >
             <span>{module.shortLabel}</span>
-            <small>{module.status}</small>
           </button>
         ))}
       </nav>
@@ -100,6 +103,7 @@ function Topbar({
   query,
   categoryFilter,
   statusFilter,
+  filtersVisible,
   onQueryChange,
   onCategoryChange,
   onStatusChange,
@@ -109,40 +113,58 @@ function Topbar({
   query: string
   categoryFilter: 'Alle' | Category
   statusFilter: 'Alle' | PipelineStatus
+  filtersVisible: boolean
   onQueryChange: (value: string) => void
   onCategoryChange: (value: 'Alle' | Category) => void
   onStatusChange: (value: 'Alle' | PipelineStatus) => void
   onAdd: () => void
 }) {
   return (
-    <header className="topbar">
+    <header className={filtersVisible ? 'topbar' : 'topbar topbar--solo'}>
       <div>
-        <span className="label">Fashion OS / {activeModule.status}</span>
+        <span className="label">Fashion OS / {activeModule.label}</span>
         <h1>{activeModule.label}</h1>
         <p className="topbar-summary">{activeModule.summary}</p>
       </div>
-      <div className="topbar-actions">
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Suche nach Name, Kategorie, Stadt, Quelle"
-        />
-        <select value={categoryFilter} onChange={(event) => onCategoryChange(event.target.value as 'Alle' | Category)}>
-          <option>Alle</option>
-          {categories.map((category) => (
-            <option key={category}>{category}</option>
-          ))}
-        </select>
-        <select value={statusFilter} onChange={(event) => onStatusChange(event.target.value as 'Alle' | PipelineStatus)}>
-          <option>Alle</option>
-          {pipelineStatuses.map((status) => (
-            <option key={status}>{status}</option>
-          ))}
-        </select>
-        <button type="button" className="primary-button" onClick={onAdd}>
-          Neuer Kontakt
-        </button>
-      </div>
+      {filtersVisible && (
+        <div className="topbar-actions">
+          <label className="topbar-field">
+            <span className="field-label">Suche</span>
+            <input
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Suche nach Name, Kategorie, Stadt, Quelle"
+            />
+          </label>
+          <label className="topbar-field">
+            <span className="field-label">Kategorie</span>
+            <select
+              value={categoryFilter}
+              onChange={(event) => onCategoryChange(event.target.value as 'Alle' | Category)}
+            >
+              <option>Alle</option>
+              {categories.map((category) => (
+                <option key={category}>{category}</option>
+              ))}
+            </select>
+          </label>
+          <label className="topbar-field">
+            <span className="field-label">Status</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => onStatusChange(event.target.value as 'Alle' | PipelineStatus)}
+            >
+              <option>Alle</option>
+              {pipelineStatuses.map((status) => (
+                <option key={status}>{status}</option>
+              ))}
+            </select>
+          </label>
+          <button type="button" className="primary-button" onClick={onAdd}>
+            Neuer Kontakt
+          </button>
+        </div>
+      )}
     </header>
   )
 }
