@@ -22,13 +22,15 @@ Recommended service:
 - Node version: `24`
 - Pull request previews: optional
 
-The production web service should only receive non-secret client configuration:
+The production web service receives no public client configuration today:
 
-- `VITE_API_BASE_URL`: deployed API service origin, for example `https://agorase-fashion-os-api.onrender.com`
+- `VITE_API_BASE_URL`: must be **empty** in production. The web bundle then falls back to relative `/api/...` paths, and Render's static-site rewrite forwards them to the API service as same-origin requests.
 
 Do not configure provider keys, Gemini keys, Google keys, or other secrets on the Static Site. `VITE_API_PROXY_TARGET` is dev-only Vite proxy configuration and must not be treated as production routing.
 
-Render Static Sites do not securely proxy `/api` to a backend by default. Use the `VITE_API_BASE_URL` approach unless the team intentionally configures and verifies an external rewrite/proxy rule for API traffic.
+Same-origin API routing is configured via Render's static-site `routes` block in `render.yaml`. The rewrite `/api/*` → `https://agorase-fashion-os-api.onrender.com/api/*` is declared **before** the SPA fallback `/*` → `/index.html` so that API traffic is forwarded to the backend instead of being served the SPA shell. This is required for iOS/WebKit browsers, which aggressively block third-party cookies even with `SameSite=None; Secure`; making the API first-party to the web origin lets the session cookie travel on every request.
+
+Manual dashboard step after merging the `render.yaml` change: if `VITE_API_BASE_URL` is already set for the web service in the Render dashboard, **delete it manually**. Dashboard values override the `render.yaml` `envVars` block, so a stale value will keep the bundle pointing at the cross-origin API and re-break iOS.
 
 ## API: Render Web Service
 
@@ -87,13 +89,12 @@ Supported fallback/optional variables:
 
 ### Web Static Site
 
-Required after frontend integration:
-
-- `VITE_API_BASE_URL`: deployed API service URL, if used by the merged web code.
+No required public env vars for production. The web bundle uses relative `/api/...` paths and the static-site rewrite in `render.yaml` forwards them to the API origin.
 
 Optional/local-only:
 
 - `VITE_API_PROXY_TARGET`: local Vite proxy target such as `http://localhost:8787`.
+- `VITE_API_BASE_URL`: leave **empty** in production. Only set during local dev if you want the web bundle to hit an absolute API URL instead of using the Vite dev proxy.
 
 Forbidden on the web service:
 
@@ -106,15 +107,20 @@ Forbidden on the web service:
 - `SESSION_SECRET`
 - Any other provider secret or credential
 
-## SPA Rewrite
+## Static Site Routes
 
-The Static Site must rewrite all application routes to the Vite entry point:
+The Static Site needs two rewrite rules, and the order matters. The API rewrite must come first so it matches before the SPA fallback consumes everything.
 
-- Source: `/*`
-- Destination: `/index.html`
-- Type: rewrite
+1. API same-origin proxy:
+   - Source: `/api/*`
+   - Destination: `https://agorase-fashion-os-api.onrender.com/api/*`
+   - Type: rewrite
+2. SPA fallback:
+   - Source: `/*`
+   - Destination: `/index.html`
+   - Type: rewrite
 
-Without this, direct visits to client routes such as `/partners`, `/creative-lab`, or `/web-ops` can return 404s.
+Without the API rewrite, browser requests must go cross-origin to the API service, and iOS/WebKit drops the session cookie. Without the SPA fallback, direct visits to client routes such as `/partners`, `/creative-lab`, or `/web-ops` return 404s.
 
 ## Security Notes
 
@@ -149,10 +155,9 @@ rg 'openaiApiKey|Authorization: `Bearer|VITE_.*KEY|localStorage.*apiKey|GEMINI_A
 
 - Confirm any `GEMINI_API_KEY` matches are limited to API env handling, `.env.example`, docs, or Render config.
 - Confirm the web bundle does not contain Gemini or Google API keys.
-- Confirm the Static Site has the `/* -> /index.html` rewrite.
-- Confirm production web config uses `VITE_API_BASE_URL` for the deployed API origin.
+- Confirm the Static Site has the `/api/* -> https://agorase-fashion-os-api.onrender.com/api/*` rewrite **before** the `/* -> /index.html` rewrite.
+- Confirm the Static Site does not have `VITE_API_BASE_URL` set (dashboard value, if any, deleted manually).
 - Confirm `VITE_API_PROXY_TARGET`, if present, is documented and used only for local development.
-- Confirm the Static Site is not relying on an implicit `/api` proxy to reach the backend.
 - Confirm the API service has `ALLOWED_ORIGINS` set to the exact deployed Static Site URL, not `*`.
 - Confirm Render created `agorase-fashion-os-db` in Frankfurt.
 - Confirm API env has `DATABASE_URL` from `agorase-fashion-os-db` with `property: connectionString`.

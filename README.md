@@ -72,17 +72,19 @@ Recommended web settings:
 
 - Build command: `npm install && npm run build:web`
 - Publish directory: `apps/web/dist`
-- SPA rewrite: `/*` to `/index.html`
-- Public env: `VITE_API_BASE_URL=https://your-api-service.onrender.com`
+- Routes (order matters, see `render.yaml`):
+  1. Rewrite `/api/*` to `https://agorase-fashion-os-api.onrender.com/api/*` (same-origin proxy to the API)
+  2. Rewrite `/*` to `/index.html` (SPA fallback)
+- Public env: `VITE_API_BASE_URL` must be **empty** in production. The web bundle falls back to relative `/api/...` paths, and the Render rewrite above forwards them to the API origin as first-party requests. This is required for iOS/WebKit, which blocks third-party cookies even with `SameSite=None; Secure`.
 
 Initial Blueprint values to enter in Render:
 
-- API service `GEMINI_API_KEY`: your Gemini API key
-- API service `ALLOWED_ORIGINS`: the deployed web Static Site origin
-- API service `ADMIN_PASSWORD`: a strong admin password
-- API service `SESSION_SECRET`: a random long session signing secret
-- Web Static Site `VITE_API_BASE_URL`: the deployed API service origin
+- API service Gemini key: your Gemini API key
+- API service allowed-origins: the deployed web Static Site origin
+- API service admin password: a strong admin password
+- API service session signing secret: a random long string
+- Web Static Site `VITE_API_BASE_URL`: leave unset. If it was previously set in the Render dashboard, delete it manually — dashboard values override `render.yaml`.
 
-`VITE_API_PROXY_TARGET` is local-development-only. Production browser calls should use `VITE_API_BASE_URL`.
+`VITE_API_PROXY_TARGET` is local-development-only. In production the same-origin rewrite in `render.yaml` handles API routing.
 
 See `docs/deployment/render-readiness.md` for the deployment checklist.

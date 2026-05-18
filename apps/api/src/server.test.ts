@@ -360,6 +360,23 @@ describe('API server', () => {
     expect(response.headers.get('access-control-allow-methods')).toContain('DELETE')
   })
 
+  it('accepts requests without an Origin header (same-origin via Render rewrite)', async () => {
+    const login = await handleRequest(
+      new Request('http://localhost/api/auth/login', { method: 'POST', body: JSON.stringify({ password: 'pw' }) }),
+      readEnv({ ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'secret', ALLOWED_ORIGINS: 'https://agorase-fashion-os-web.onrender.com' }),
+    )
+    const response = await handleRequest(
+      new Request('http://localhost/api/partners', { headers: { cookie: login.headers.get('set-cookie') ?? '' } }),
+      {
+        env: readEnv({ ADMIN_PASSWORD: 'pw', SESSION_SECRET: 'secret', ALLOWED_ORIGINS: 'https://agorase-fashion-os-web.onrender.com' }),
+        partnersRepository: fakePartnersRepository(),
+      },
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://agorase-fashion-os-web.onrender.com')
+  })
+
   it('does not echo disallowed origins', async () => {
     const response = await handleRequest(
       new Request('http://localhost/api/health', {
