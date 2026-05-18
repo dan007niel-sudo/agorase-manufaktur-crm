@@ -1,6 +1,6 @@
 # Session Handoff
 
-Last updated: 2026-05-17
+Last updated: 2026-05-18
 
 ## Purpose
 
@@ -43,12 +43,13 @@ As of the last update:
 - Remote: `origin`
 - Local `main` was clean and in sync with `origin/main`
 - Latest pushed app commit:
-  - `4a5db49 feat: reorder mockup reference images via arrow buttons`
-- Phase 3 was declared completion-ready in `fbb5fcc`. Five follow-up
+  - `2f72f52 feat: proxy /api same-origin through render web service`
+- Phase 3 was declared completion-ready in `fbb5fcc`. Six follow-up
   Phase-4 enhancements have shipped on top of it.
 
 Recent important commits (newest first):
 
+- `2f72f52 feat: proxy /api same-origin through render web service` (Phase 4F)
 - `4a5db49 feat: reorder mockup reference images via arrow buttons` (Phase 4E)
 - `32e3420 feat: allow partner delete and stop seeding empty databases` (Phase 4D)
 - `12a9ff4 feat: add DACH legal templates for DE/AT/CH` (Phase 4C)
@@ -115,6 +116,7 @@ Phase 4 enhancements (shipped on top of the completion baseline) are live:
 - Phase 4C DACH Legal Templates is LIVE: 18 curated legal templates (6 × DE / 6 × AT / 6 × CH) covering Impressum, Datenschutz, AGB, Widerruf/Rücktritt/Rücknahme, Verpackungsregister, Markenregistrierung. Hardcoded in `packages/shared/src/legalTemplates.ts` (no DB table). LegalView has a new "Aus Vorlage anlegen" picker with country chip filter, jurisdiction `<datalist>` (DE/AT/CH/EU), and a visible "Templates sind Startpunkte, keine Rechtsberatung" disclaimer.
 - Phase 4D Partner Delete & Fresh-Start UX is LIVE: `deletePartner` web client added (DELETE endpoint already existed server-side), red "Partner löschen" button with `window.confirm` in PartnersView, empty-state message when no records exist, and the seed auto-fallback in App.tsx was removed so an empty database stays empty. The "Seed neu importieren" button in Settings remains as opt-in.
 - Phase 4E Mockup Reference Reordering is LIVE: per-reference ↑/↓ arrow buttons in MockupsView reorder the up to 3 reference images on a mockup job via an immutable swap helper. End buttons are disabled at the array boundaries. Pure web change — backend, API, and shared contracts are unchanged, and no migration was needed.
+- Phase 4F Same-Origin-Proxy ist LIVE: Render-Static-Site rewrite `/api/*` → `https://agorase-fashion-os-api.onrender.com/api/*` vor dem SPA-Fallback. Frontend nutzt jetzt relative `/api/...`-Pfade (alle 13 API-Module fallen via `VITE_API_BASE_URL || ''` auf relative Pfade zurück). Effekt: iOS-Browser (WebKit) sehen alle Requests als first-party und schicken den Session-Cookie wieder mit. Behebt die "Partnerdaten konnten nicht synchronisiert werden / Authentication required."-Symptome auf iOS Safari/Chrome.
 
 ## Important Files
 
@@ -244,6 +246,10 @@ Phase 3G deployment:
 - Polling showed the API switched to the new version when unauthenticated `/api/releases` changed to `401 Authentication required`.
 - Live health still reported `ok: true`, Gemini ready, image ready.
 - Live web root returned `200`.
+
+Phase 4F lessons:
+
+- **iOS-WebKit blockt Cross-Site-Cookies aggressiv.** Selbst mit `HttpOnly; Secure; SameSite=None` und korrektem `Access-Control-Allow-Credentials: true` werden Cookies auf iOS-Safari/Chrome bei jedem Cross-Origin-Request stillschweigend nicht mitgeschickt. Fix: same-origin Setup via Render-Static-Site-Rewrite, sodass `/api/*` über den Web-Origin proxiert wird. Manueller Folgeschritt nötig: `VITE_API_BASE_URL` im Render-Dashboard für den Web-Service löschen, damit der yaml-Default greift und das Web-Bundle relative Pfade einbettet.
 
 ## Existing Worktrees
 
@@ -462,6 +468,8 @@ Phase 2B should use:
 - `SameSite=None` in production because API and web are on different Render origins
 - `credentials: 'include'` in browser API calls
 - exact `ALLOWED_ORIGINS`, never wildcard
+
+Phase 4F note: With the Render Static Site rewrite `/api/*` → API service in place, the browser sees web and API on the same origin, so the session cookie behaves as first-party (fixes iOS WebKit). `ALLOWED_ORIGINS` on the API service is now a belt-and-suspenders setting; it still applies to any direct cross-origin calls but the production web app no longer relies on it.
 
 ## Quick Current Commands
 
