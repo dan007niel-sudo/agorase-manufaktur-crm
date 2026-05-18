@@ -392,21 +392,12 @@ private admin operating system. After Phase 3J ships:
 
 The app is ready for daily admin use. There is no pending Phase-3 work.
 
-### Open manual step (Phase 4D follow-up)
+### Phase 4D follow-up: DONE
 
-The six original seed partner records imported during Phase 2A
-(`Atelier Stoffwerk Berlin`, `Confezione Lago` etc.) are still in the
-live Render Postgres. To start with a clean CRM:
-
-1. Log in at https://agorase-fashion-os-web.onrender.com
-2. Sidebar → Partners
-3. For each seed entry: select the row → click the red **"Partner
-   löschen"** button in the detail panel → confirm.
-4. After the last one, the empty-state message replaces the table.
-
-The "Seed neu importieren"-Button in Settings can re-seed at any time
-if the user wants the demo data back. Phase 4D removed the automatic
-seed-fallback in `App.tsx`, so empty databases now stay empty.
+The six original seed partner records were deleted manually via the
+red "Partner löschen" button on 2026-05-18. The live Render Postgres
+now starts empty. The "Seed neu importieren"-Button in Settings
+remains as opt-in if demo data is ever needed again.
 
 ### Possible next-phase ideas (post-4D)
 
