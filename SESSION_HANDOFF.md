@@ -49,6 +49,7 @@ As of the last update:
 
 Recent important commits (newest first):
 
+- `59cbd13 feat: collapse mockups layout to single column when history empty` (Phase 4I)
 - `a436ee5 feat: replace mobile scroll tab strip with off-canvas drawer` (Phase 4H)
 - `e93cd66 feat: polish sidebar, topbar, and section copy for clarity` (Phase 4G)
 - `2f72f52 feat: proxy /api same-origin through render web service` (Phase 4F)
@@ -121,6 +122,7 @@ Phase 4 enhancements (shipped on top of the completion baseline) are live:
 - Phase 4F Same-Origin-Proxy ist LIVE: Render-Static-Site rewrite `/api/*` → `https://agorase-fashion-os-api.onrender.com/api/*` vor dem SPA-Fallback. Frontend nutzt jetzt relative `/api/...`-Pfade (alle 13 API-Module fallen via `VITE_API_BASE_URL || ''` auf relative Pfade zurück). Effekt: iOS-Browser (WebKit) sehen alle Requests als first-party und schicken den Session-Cookie wieder mit. Behebt die "Partnerdaten konnten nicht synchronisiert werden / Authentication required."-Symptome auf iOS Safari/Chrome.
 - Phase 4G UI Clarity Polish ist LIVE: Sidebar-ACTIVE-Badges entfernt (alle Sektionen sind live, das Badge war redundant), Breadcrumb zeigt jetzt den aktuellen Sektionsnamen, Top-Bar mit Suche/Kategorie/Status/Neuer-Kontakt nur noch in Command Center, Sourcing und Partners (vorher in allen 10 Sektionen — auch Settings/Mockups, wo es keinen Sinn ergab). Dropdowns haben sichtbare Labels ("Suche", "Kategorie", "Status"). Alle 10 Section-Descriptions wurden ins Deutsche übersetzt. Settings: "Phase 2A" → "Daten-Synchronisation", "Seed speichern" → "Demo-Daten importieren". Neue CSS-Klasse `.destructive-button` / `.danger-button` (#b42318) macht den "Partner löschen"-Button als destruktive Aktion erkennbar.
 - Phase 4H Mobile Off-Canvas-Drawer ist LIVE: Unter 980px Viewport wird die Sidebar zum Off-Canvas-Drawer. Hamburger-Button (☰) in einer neuen `.mobile-header`-Leiste öffnet den Drawer per Slide-in von links; Backdrop verdunkelt den Hintergrund. Schließt auf Escape, Backdrop-Click, Section-Auswahl, sowie auf Resize zu Desktop (≥ 981px). Body-Scroll ist gelocked solange der Drawer offen ist. ARIA-Wiring: `aria-expanded`, `aria-controls="primary-navigation"`, dynamisches `aria-label`. Ersetzt den vorherigen Sticky-Top-Horizontal-Scroll-Tab-Strip, der auf iOS nur ~7 von 10 Sektionen sichtbar machte.
+- Phase 4I Mockups Layout Collapse ist LIVE: Wenn die Mockup-Job-Liste leer ist (`sortedJobs.length === 0`), kollabiert das 3-Spalten-Layout zu einer einzelnen zentrierten Form-Spalte (max-width 720px). Sobald mindestens ein Job existiert, kehrt das volle 3-Spalten-Layout zurück. Vorher fraßen die zwei leeren Verlauf/Detail-Placeholder ~60% der Workspace-Breite und zwangen die Form in eine schmale linke Spalte mit umbrechenden Chips.
 
 ## Important Files
 
@@ -410,7 +412,7 @@ If more work follows, candidates raised during the Phase-4 sessions:
   Mockups, Creative Lab, Legal, Partners).
 - Per-reference rejection feedback when Gemini fails a single image.
 - Image proxy / DAM for larger mockup outputs and reference assets.
-- Mockups: leere Verlauf/Detail-Spalten kollabieren, sodass die Form mehr Platz bekommt.
+- Gleiches Layout-Kollaps-Pattern (wie Phase 4I in Mockups) auf CreativeLabView anwenden, falls dort dieselbe "drei Spalten mit leerem Verlauf"-Reibung auffällt.
 
 ### Possible future work
 
