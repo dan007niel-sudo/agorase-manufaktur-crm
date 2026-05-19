@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { AppShell } from './app/AppShell'
 import { AuthGate } from './app/AuthGate'
-import { formatLocalDate, selectVisibleRecord } from './app/appState'
+import { formatLocalDate, isTopbarFilterSection, selectVisibleRecord } from './app/appState'
 import {
   resetStoredStateFromQuery,
   useAdminAuth,
@@ -128,8 +128,7 @@ function App() {
     .concat(createLegalCommandTasks(legalNotes, persistedTasksById, today))
   const openTaskCount = tasks.filter((task) => !task.completed).length
   const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
-  const filterSections: Section[] = ['Command Center', 'Sourcing', 'Partners']
-  const filtersVisible = filterSections.includes(activeSection)
+  const filtersVisible = isTopbarFilterSection(activeSection)
 
   useEffect(() => {
     if (authStatus !== 'authenticated') return
@@ -250,7 +249,7 @@ function App() {
       setStatusFilter('Alle')
       setRecordsStatus('ready')
       setRecordsError('')
-      setActiveSection('Partners')
+      changeSection('Partners')
     } catch (caught) {
       setRecordsStatus('error')
       setRecordsError(caught instanceof Error ? caught.message : 'Partner konnten nicht importiert werden.')
@@ -283,6 +282,11 @@ function App() {
     }
   }
 
+  function changeSection(section: Section) {
+    setActiveSection(section)
+    setFormOpen(false)
+  }
+
   return (
     <AuthGate status={authStatus} error={authError} onLogin={handleLogin}>
       <AppShell
@@ -293,7 +297,7 @@ function App() {
         categoryFilter={categoryFilter}
         statusFilter={statusFilter}
         filtersVisible={filtersVisible}
-        onSectionChange={setActiveSection}
+        onSectionChange={changeSection}
         onQueryChange={setQuery}
         onCategoryChange={setCategoryFilter}
         onStatusChange={setStatusFilter}
@@ -309,7 +313,7 @@ function App() {
             records={records}
             tasks={tasks}
             onSelectRecord={setSelectedId}
-            onSectionChange={setActiveSection}
+            onSectionChange={changeSection}
             onToggleTask={toggleTask}
           />
         )}

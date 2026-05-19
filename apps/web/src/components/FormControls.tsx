@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { categories, pipelineStatuses, type Manufactory } from '../types'
 import { PanelHeader } from './Panel'
 
@@ -17,10 +17,19 @@ export function RecordForm({
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCancel()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
   return (
-    <div className="modal-backdrop">
+    <div className="modal-backdrop" onClick={onCancel}>
       <form
         className="record-form"
+        onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault()
           void onSave({ ...draft, id: draft.id || draft.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') })

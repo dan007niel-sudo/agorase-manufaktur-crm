@@ -15,7 +15,7 @@
     "build:web": "npm run build -w @agorase/shared && npm run build -w @agorase/web",
     "build:api": "npm run build -w @agorase/shared && npm run build -w @agorase/api",
     "lint": "eslint .",
-    "test": "npm run build -w @agorase/shared && vitest run",
+    "test": "npm run build -w @agorase/shared && vitest run --exclude '.worktrees/**'",
     "typecheck": "npm run typecheck -w @agorase/shared && npm run typecheck -w @agorase/api && npm run typecheck -w @agorase/web",
     "preview": "npm run preview -w @agorase/web"
   },

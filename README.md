@@ -30,6 +30,21 @@ npm run dev:web
 
 The Vite dev server proxies `/api` to `VITE_API_PROXY_TARGET`, which defaults to `http://localhost:8787`.
 
+### Local Database
+
+For local QA against the real API/repository path, start Postgres with Docker Compose:
+
+```bash
+cp .env.example .env
+docker compose up -d postgres
+```
+
+Set `ADMIN_PASSWORD` and `SESSION_SECRET` in `.env`, then run `npm run dev:api`. The API runs idempotent migrations at startup against:
+
+```txt
+postgresql://postgres:postgres@localhost:5432/agorase_fashion_os
+```
+
 ## Verification
 
 ```bash
