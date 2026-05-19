@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { AppShell } from './app/AppShell'
 import { AuthGate } from './app/AuthGate'
+import { formatLocalDate, selectVisibleRecord } from './app/appState'
 import {
   resetStoredStateFromQuery,
   useAdminAuth,
@@ -97,7 +98,7 @@ function App() {
     })
   }, [records, query, categoryFilter, statusFilter])
 
-  const today = '2026-05-14'
+  const today = formatLocalDate(new Date())
   const metrics = calculateMetrics(records, today)
   const persistedTasksById = useMemo(() => new Map(persistedTasks.map((task) => [task.id, task])), [persistedTasks])
   const tasks = deriveTasks(records, today)
@@ -208,10 +209,11 @@ function App() {
     }
   }
 
-  async function updateSelectedRecord(patch: Partial<Manufactory>) {
-    if (!selectedRecord) return
+  const selectedPartnerRecord = selectVisibleRecord(filteredRecords, selectedId)
+
+  async function updateRecord(id: string, patch: Partial<Manufactory>) {
     try {
-      const updated = await updatePartner(selectedRecord.id, patch)
+      const updated = await updatePartner(id, patch)
       setRecords((current) => upsertManufacture(current, updated))
       setSelectedId(updated.id)
       setRecordsStatus('ready')
@@ -317,10 +319,15 @@ function App() {
         {activeSection === 'Partners' && (
           <PartnersView
             records={filteredRecords}
-            selectedRecord={selectedRecord}
+            selectedRecord={selectedPartnerRecord}
             onSelect={setSelectedId}
-            onEdit={() => setFormOpen(true)}
-            onPatch={updateSelectedRecord}
+            onEdit={() => {
+              if (selectedPartnerRecord) setSelectedId(selectedPartnerRecord.id)
+              setFormOpen(true)
+            }}
+            onPatch={(patch) => {
+              if (selectedPartnerRecord) void updateRecord(selectedPartnerRecord.id, patch)
+            }}
             onDelete={removeRecord}
           />
         )}
