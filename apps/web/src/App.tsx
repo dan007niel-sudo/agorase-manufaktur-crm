@@ -98,7 +98,8 @@ function App() {
     })
   }, [records, query, categoryFilter, statusFilter])
 
-  const today = formatLocalDate(new Date())
+  const now = new Date()
+  const today = formatLocalDate(now)
   const metrics = calculateMetrics(records, today)
   const persistedTasksById = useMemo(() => new Map(persistedTasks.map((task) => [task.id, task])), [persistedTasks])
   const tasks = deriveTasks(records, today)
@@ -312,6 +313,7 @@ function App() {
             metrics={metrics}
             records={records}
             tasks={tasks}
+            now={now}
             onSelectRecord={setSelectedId}
             onSectionChange={changeSection}
             onToggleTask={toggleTask}

@@ -355,6 +355,76 @@ textarea:focus {
   gap: 16px;
 }
 
+.command-welcome {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.72fr);
+  gap: 16px;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fffdf8;
+  padding: 16px;
+}
+
+.command-welcome h2 {
+  margin: 6px 0 8px;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.command-welcome p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.daily-inspiration {
+  display: grid;
+  gap: 9px;
+  border-left: 1px solid var(--line);
+  padding-left: 16px;
+}
+
+.daily-inspiration__header,
+.daily-inspiration__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.daily-inspiration__header span,
+.daily-inspiration__meta,
+.daily-inspiration small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.daily-inspiration__header span {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.daily-inspiration__header strong,
+.daily-inspiration__meta span:last-child {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.daily-inspiration blockquote {
+  margin: 0;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.daily-inspiration p {
+  color: var(--soft-text);
+}
+
 .metric-grid {
   grid-column: 1 / -1;
   display: grid;
@@ -1135,6 +1205,7 @@ label {
   .topbar,
   .split-view,
   .view-grid,
+  .command-welcome,
   .ai-research-layout,
   .releases-layout,
   .web-ops-layout,
@@ -1145,6 +1216,13 @@ label {
   .release-task-row,
   .sample-row {
     grid-template-columns: 1fr;
+  }
+
+  .daily-inspiration {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    padding-left: 0;
+    padding-top: 14px;
   }
 
   .topbar-actions {
@@ -1169,6 +1247,8 @@ label {
   .topbar-actions,
   .metric-grid,
   .form-grid,
+  .daily-inspiration__header,
+  .daily-inspiration__meta,
   .follow-row,
   .release-partner-row,
   .task-row {

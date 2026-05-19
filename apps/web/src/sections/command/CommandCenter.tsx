@@ -1,4 +1,5 @@
 import { calculateMetrics } from '../../crmUtils'
+import { getDailyInspiration, getTimeGreeting } from '../../app/dailyInspiration'
 import type { FashionOsModule } from '../../fashionOs'
 import type { CrmTask, Manufactory } from '../../types'
 import { Metric, PanelHeader } from '../../components/Panel'
@@ -10,6 +11,7 @@ export function CommandCenter({
   metrics,
   records,
   tasks,
+  now = new Date(),
   onSelectRecord,
   onSectionChange,
   onToggleTask,
@@ -17,14 +19,37 @@ export function CommandCenter({
   metrics: ReturnType<typeof calculateMetrics>
   records: Manufactory[]
   tasks: CrmTask[]
+  now?: Date
   onSelectRecord: (id: string) => void
   onSectionChange: (section: Section) => void
   onToggleTask: (task: CrmTask) => void
 }) {
   const topRecords = records.filter((record) => record.priority === 'A' || record.brandFit === 'A').slice(0, 4)
+  const greeting = getTimeGreeting(now, 'Max')
+  const inspiration = getDailyInspiration(now)
 
   return (
     <section className="view-grid">
+      <div className="command-welcome">
+        <div>
+          <span className="label">Persönlicher Start</span>
+          <h2>{greeting}</h2>
+          <p>Heute zählt Fokus, Klarheit und treue Arbeit.</p>
+        </div>
+        <article className="daily-inspiration" aria-label="Impuls des Tages">
+          <div className="daily-inspiration__header">
+            <span>Impuls des Tages</span>
+            <strong>{inspiration.theme}</strong>
+          </div>
+          <blockquote>„{inspiration.excerpt}“</blockquote>
+          <div className="daily-inspiration__meta">
+            <span>{inspiration.reference}</span>
+            <span>{inspiration.translation}</span>
+          </div>
+          <p>{inspiration.reflection}</p>
+          <small>Heute: {inspiration.action.replace(/^Heute:\s*/, '')}</small>
+        </article>
+      </div>
       <div className="metric-grid">
         <Metric label="Gesamt" value={metrics.total} />
         <Metric label="Markenfit A" value={metrics.highFit} />
