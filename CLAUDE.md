@@ -41,8 +41,8 @@ Data flow per domain:
 - `apps/api/src/db/client.ts` — `pg.Pool`
 - `apps/api/src/db/migrate.ts` — startup migration; loads `schema.sql` from `dist` then falls back to `src` (Lesson: `1598023`)
 - `apps/api/src/db/schema.sql` — single source of truth for tables
-- `apps/web/src/App.tsx` — monolithic single-page container nach RHE-Pattern; drei unabhängige `useState`-Cluster; alle drei Panels permanent gemountet, getoggelt via `hidden`-Attribut (State-Erhalt beim Tab-Wechsel)
-- `apps/web/src/fashionOs.ts` — Modul-Registry (aktuell 3 Einträge: Sourcing, Partners, Mockups)
+- `apps/web/src/App.tsx` — monolithic single-page container nach RHE-Pattern; vier unabhängige `useState`-Cluster (MockupStudio, CreativeLab, ManufakturScout, Partners); alle vier Panels permanent gemountet, getoggelt via `hidden`-Attribut (State-Erhalt beim Tab-Wechsel); Cross-Tab-Handoffs (Creative Lab → Mockup Studio Prompt, Manufaktur Scout → Partners Pipeline) via prop-derived state
+- `apps/web/src/fashionOs.ts` — Modul-Registry (4 Einträge in Workflow-Reihenfolge: MockupStudio, CreativeLab, ManufakturScout, Partners)
 - `apps/web/src/app/AppShell.tsx`, `apps/web/src/app/AuthGate.tsx`, `apps/web/src/app/authState.ts` — shell + auth
 - `apps/web/src/aiResearch.ts` — existing AI-research web client (template for AI features)
 - `packages/shared/src/index.ts` — barrel re-exports every shared module
