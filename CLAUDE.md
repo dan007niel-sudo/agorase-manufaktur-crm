@@ -2,7 +2,9 @@
 
 ## What is this project
 
-Private, admin-only Operating System für Sourcing, Bewertung, Production, Creative Lab, Mockups, Legal Orientation, Releases, Web Ops und Settings einer kuratierten Fashion-Brand. Kein Public-Storefront, kein Multi-Tenancy, kein Billing.
+Private, admin-only Manufaktur-CRM für eine kuratierte Fashion-Brand. Drei fokussierte Module nach dem RHE-Single-Page-Pattern: **Sourcing → Partners → Mockups** (Recherche → Kontakt → Visualisierung). Kein Public-Storefront, kein Multi-Tenancy, kein Billing.
+
+**History note:** Ursprünglich 10 Sektionen (Command Center, Sourcing, Partners, Production, Creative Lab, Mockups, Legal, Releases, Web Ops, Settings). Phase 5 (PR #1, Commit `f97c664`) hat das Frontend auf 3 Module reduziert. Backend-Routen + Tabellen für die 7 entfernten Module existieren noch (stiller Dead Code aus Frontend-Sicht), Cleanup steht als Folge-PR aus.
 
 ## Stack
 
@@ -39,8 +41,8 @@ Data flow per domain:
 - `apps/api/src/db/client.ts` — `pg.Pool`
 - `apps/api/src/db/migrate.ts` — startup migration; loads `schema.sql` from `dist` then falls back to `src` (Lesson: `1598023`)
 - `apps/api/src/db/schema.sql` — single source of truth for tables
-- `apps/web/src/App.tsx` — composition root; loads all section data after auth; section router
-- `apps/web/src/fashionOs.ts` — sidebar module registry (every section listed here)
+- `apps/web/src/App.tsx` — monolithic single-page container nach RHE-Pattern; drei unabhängige `useState`-Cluster; alle drei Panels permanent gemountet, getoggelt via `hidden`-Attribut (State-Erhalt beim Tab-Wechsel)
+- `apps/web/src/fashionOs.ts` — Modul-Registry (aktuell 3 Einträge: Sourcing, Partners, Mockups)
 - `apps/web/src/app/AppShell.tsx`, `apps/web/src/app/AuthGate.tsx`, `apps/web/src/app/authState.ts` — shell + auth
 - `apps/web/src/aiResearch.ts` — existing AI-research web client (template for AI features)
 - `packages/shared/src/index.ts` — barrel re-exports every shared module
@@ -138,6 +140,8 @@ Per phase (`3H`, `3D`, `3E`, `3F`, `3I`, `3J`):
 - **Adding new shared types: check for naming collisions.** `packages/shared/src/index.ts` re-exports every module via `export * from`. Two modules exporting the same name (e.g. `LegalNote` once in `fashion.ts` and once in `legal.ts`) produces a hard TS error. Before adding a type, grep the existing shared modules. Remove dead placeholder types when adding the real version.
 - **Web-bundle secret-scan regex matches env-var NAMES.** The deploy-gate `rg 'GEMINI_API_KEY|...' apps/web/dist` matches the literal strings, not just values. When the UI documents required secrets (e.g. Settings/Diagnostics), use German labels (`Gemini-API-Schlüssel`) — not literal env-var names. (Lesson from Phase 3I.)
 - **Persistence-before-call for AI provider routes.** Write the `pending` job row to the DB before calling the provider; update to `completed`/`failed` after. A crash or timeout mid-call still leaves an audit row. Pattern established in Phase 3E Mockups and 3D Creative Lab.
+- **Tab state survives tab-switches only if the panel stays mounted.** `{activeSection === 'X' && <View />}` un-mounts the view, destroying any local `useState` (Sourcing form, Mockups prompt + uploads, AI suggestions). Fix: render all panels permanently inside `<div role="tabpanel" hidden={activeSection !== '...'}>` wrappers. The `hidden` attribute sets `display: none` without unmounting — React keeps the state. Pair with `id`/`aria-labelledby` on the panel and `aria-controls` on the tab for A11y. (Phase 5, PR #1.)
+- **Frontend reduction leaves dead web-API clients behind.** When deleting section folders (`sections/<domain>/`), the matching `apps/web/src/api/<domain>Api.ts` files are no longer imported but still ship as files in the repo. Vite tree-shakes them out of the production bundle, and their `.test.ts` siblings still pass — so build gates don't flag them. They are tech debt: separate cleanup PR alongside the backend-route removal. (Phase 5 observed 9 such orphans.)
 
 ## Out of Scope
 
