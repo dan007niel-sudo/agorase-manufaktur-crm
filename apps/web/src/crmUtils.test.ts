@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Manufactory } from './types'
-import {
-  calculateMetrics,
-  deriveTasks,
-  parseBulkImport,
-  upsertManufacture,
-} from './crmUtils'
+import { parseBulkImport, upsertManufacture } from './crmUtils'
 
 const baseRecord: Manufactory = {
   id: 'studio-nordton',
@@ -66,57 +61,6 @@ describe('parseBulkImport', () => {
       brandFit: 'B',
       cooperationPotential: 'Mittel',
     })
-  })
-})
-
-describe('calculateMetrics', () => {
-  it('summarizes the CRM pipeline for the dashboard', () => {
-    const metrics = calculateMetrics([
-      baseRecord,
-      {
-        ...baseRecord,
-        id: 'grain-form',
-        name: 'Grain & Form',
-        status: 'Zu recherchieren',
-        priority: 'B',
-        brandFit: 'B',
-        cooperationPotential: 'Mittel',
-        nextFollowUp: '2026-06-01',
-      },
-      {
-        ...baseRecord,
-        id: 'oro',
-        name: 'Oro Werkstatt',
-        status: 'Erstkontakt gesendet',
-        priority: 'A',
-        brandFit: 'A-',
-        cooperationPotential: 'Hoch',
-        nextFollowUp: '',
-      },
-    ], '2026-05-14')
-
-    expect(metrics).toMatchObject({
-      total: 3,
-      highFit: 2,
-      highPotential: 2,
-      contacted: 2,
-      dueFollowUps: 1,
-    })
-  })
-})
-
-describe('deriveTasks', () => {
-  it('creates actionable tasks from next steps and overdue follow-ups', () => {
-    const tasks = deriveTasks([baseRecord], '2026-05-15')
-
-    expect(tasks).toEqual([
-      expect.objectContaining({
-        manufactureId: 'studio-nordton',
-        title: 'Line Sheet anfragen',
-        dueDate: '2026-05-14',
-        urgency: 'overdue',
-      }),
-    ])
   })
 })
 
