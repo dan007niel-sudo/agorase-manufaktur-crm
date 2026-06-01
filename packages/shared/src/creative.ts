@@ -112,6 +112,29 @@ export interface BrainstormResponse {
   prompt: string
 }
 
+// RHE Creative Lab — drop concept generator.
+// Concepts are produced from a short theme/tone brief and return Mockup-Studio-ready prompts.
+export interface DropConceptRequest {
+  theme: string
+  productMode: string
+  tone: string
+}
+
+export interface DropConcept {
+  title: string
+  story: string
+  heroPiece: string
+  palette: string[]
+  printDirection: string
+  mockupPrompt: string
+  productionNotes: string[]
+}
+
+export interface DropConceptResponse {
+  concepts: DropConcept[]
+  model: string
+}
+
 export interface CreativeBriefsResponse {
   briefs: CreativeBrief[]
 }

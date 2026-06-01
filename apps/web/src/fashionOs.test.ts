@@ -2,11 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { fashionOsModules } from './fashionOs'
 
 describe('fashionOsModules', () => {
-  it('lists the three active workflow sections in workflow order', () => {
+  it('lists the four active workflow sections in RHE order (produce → ideate → source → pipeline)', () => {
     expect(fashionOsModules.map((module) => module.section)).toEqual([
-      'Sourcing',
+      'MockupStudio',
+      'CreativeLab',
+      'ManufakturScout',
       'Partners',
-      'Mockups',
+    ])
+  })
+
+  it('uses RHE labels for the visible tab names', () => {
+    expect(fashionOsModules.map((module) => module.label)).toEqual([
+      'Mockup Studio',
+      'Creative Lab',
+      'Manufaktur Scout',
+      'Partners',
     ])
   })
 

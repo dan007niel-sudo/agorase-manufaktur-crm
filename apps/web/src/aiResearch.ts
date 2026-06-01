@@ -1,3 +1,4 @@
+import type { ResearchQualityGate, ResearchVerification } from '@agorase/shared'
 import { slugify } from './crmUtils'
 import type { Category, FitScore, Manufactory, Potential, PriceLevel, Priority } from './types'
 import { categories } from './types'
@@ -8,6 +9,7 @@ export interface AiResearchCriteria {
   productFocus: string
   priceLevel: PriceLevel | 'Alle'
   count: number
+  europeFocus?: boolean
 }
 
 export interface AiResearchSource {
@@ -37,6 +39,13 @@ export interface AiResearchSuggestion {
   confidence: number
   rationale: string
   sources: AiResearchSource[]
+  // Server-side RHE additions. May be missing for legacy callers — keep optional and
+  // default in `normalizeSuggestion` so the UI always has a value.
+  score?: number
+  contactPage?: string
+  address?: string
+  verification?: ResearchVerification
+  researchQuality?: ResearchQualityGate
 }
 
 export const aiSuggestionSchema = {
@@ -134,7 +143,7 @@ export async function requestAiManufactories({
   criteria: AiResearchCriteria
 }) {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
-  const response = await fetch(`${apiBaseUrl}/api/research/partners/`, {
+  const response = await fetch(`${apiBaseUrl}/api/research/partners`, {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -146,6 +155,7 @@ export async function requestAiManufactories({
       productFocus: criteria.productFocus,
       priceLevel: criteria.priceLevel,
       count: criteria.count,
+      europeFocus: criteria.europeFocus ?? false,
     }),
   })
 
@@ -235,5 +245,9 @@ function normalizeSuggestion(suggestion: AiResearchSuggestion): AiResearchSugges
     nextStep: suggestion.nextStep || 'Line Sheet oder Wholesale-Kontakt prüfen',
     confidence: Math.max(0, Math.min(100, Number(suggestion.confidence) || 0)),
     sources: Array.isArray(suggestion.sources) ? suggestion.sources : [],
+    score:
+      typeof suggestion.score === 'number'
+        ? Math.max(0, Math.min(100, Math.round(suggestion.score)))
+        : undefined,
   }
 }

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import type { ResearchQualityStatus, VerifiedField } from '@agorase/shared'
 import {
   requestAiManufactories,
   suggestionToManufacture,
@@ -10,6 +11,14 @@ import { PanelHeader } from '../../components/Panel'
 import { PartnerTable } from '../../components/PartnerTable'
 import { categories, type Category, type Manufactory } from '../../types'
 
+/**
+ * Manufaktur Scout (formerly Sourcing). Renders KI-Recherche with the RHE server-side
+ * quality gate: each hit shows a research score and per-field verification status.
+ *
+ * The `onAiImport` callback both upserts the partner into the persisted CRM and is expected
+ * to navigate the user to the Partners tab — App.tsx handles that side-effect. We don't
+ * navigate from here so the parent can decide (Plan B in this phase: tab switch).
+ */
 export function SourcingView({
   onAiImport,
   onBulkImport,
@@ -32,6 +41,7 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
     productFocus: 'zeitgenoessische Streetwear, Ready-to-Wear, Accessoires und kleine Capsule Drops',
     priceLevel: 'Premium',
     count: 8,
+    europeFocus: true,
   })
   const [suggestions, setSuggestions] = useState<AiResearchSuggestion[]>([])
   const [selectedNames, setSelectedNames] = useState<string[]>([])
@@ -67,9 +77,10 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
   return (
     <section className="ai-research-layout">
       <div className="panel ai-control-panel">
-        <PanelHeader title="KI-Recherche" />
+        <PanelHeader title="Manufaktur Scout" />
         <p className="helper-copy">
-          Lass dir passende Labels, Ateliers, Hersteller und Fashion-Partner per interner Recherche vorschlagen und übernimm die besten Treffer direkt in die Partnerliste.
+          KI-Recherche mit Verifikationsstatus pro Kontakt-Feld. Übernimm geprüfte Treffer in
+          die Partners-Pipeline.
         </p>
         <label>
           Regionen / Länder
@@ -112,6 +123,16 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
             />
           </label>
         </div>
+        <label className="europe-toggle">
+          <input
+            type="checkbox"
+            checked={Boolean(criteria.europeFocus)}
+            onChange={(event) =>
+              setCriteria((current) => ({ ...current, europeFocus: event.target.checked }))
+            }
+          />
+          Europa-Fokus (EU/EEA/UK/CH bevorzugen)
+        </label>
         <div className="category-picker">
           {categories.map((category) => (
             <button
@@ -127,7 +148,7 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
         </div>
         {status === 'error' && <div className="error-box">{error}</div>}
         <button type="button" className="primary-button" onClick={runResearch} disabled={status === 'loading'}>
-          {status === 'loading' ? 'KI sucht...' : 'Fashion-Partner suchen lassen'}
+          {status === 'loading' ? 'KI sucht...' : 'Manufakturen recherchieren'}
         </button>
       </div>
 
@@ -140,36 +161,18 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
         )}
         <div className="ai-suggestion-list">
           {suggestions.map((suggestion) => (
-            <article className="ai-suggestion" key={suggestion.name}>
-              <label className="select-line">
-                <input
-                  type="checkbox"
-                  checked={selectedNames.includes(suggestion.name)}
-                  onChange={() =>
-                    setSelectedNames((current) =>
-                      current.includes(suggestion.name)
-                        ? current.filter((name) => name !== suggestion.name)
-                        : [...current, suggestion.name],
-                    )
-                  }
-                />
-                <strong>{suggestion.name}</strong>
-              </label>
-              <div className="suggestion-meta">
-                <span>{suggestion.category}</span>
-                <span>{[suggestion.city, suggestion.country].filter(Boolean).join(', ')}</span>
-                <span>Fit {suggestion.brandFit}</span>
-                <span>{suggestion.confidence}%</span>
-              </div>
-              <p>{suggestion.rationale}</p>
-              <div className="source-list">
-                {suggestion.sources.map((source) => (
-                  <a key={source.url} href={source.url} target="_blank">
-                    {source.title || source.url}
-                  </a>
-                ))}
-              </div>
-            </article>
+            <ScoutCard
+              key={suggestion.name}
+              suggestion={suggestion}
+              selected={selectedNames.includes(suggestion.name)}
+              onToggle={() =>
+                setSelectedNames((current) =>
+                  current.includes(suggestion.name)
+                    ? current.filter((name) => name !== suggestion.name)
+                    : [...current, suggestion.name],
+                )
+              }
+            />
           ))}
         </div>
         {!!suggestions.length && (
@@ -179,12 +182,92 @@ function AiResearchView({ onImport }: { onImport: (records: Manufactory[]) => vo
             disabled={!selectedSuggestions.length}
             onClick={() => void onImport(selectedSuggestions.map(suggestionToManufacture))}
           >
-            {selectedSuggestions.length} Vorschläge übernehmen
+            In Partners übernehmen ({selectedSuggestions.length})
           </button>
         )}
       </div>
     </section>
   )
+}
+
+function ScoutCard({
+  suggestion,
+  selected,
+  onToggle,
+}: {
+  suggestion: AiResearchSuggestion
+  selected: boolean
+  onToggle: () => void
+}) {
+  const research = suggestion.researchQuality
+  const verification = suggestion.verification
+  const score = suggestion.score ?? research?.score
+  return (
+    <article className="ai-suggestion">
+      <label className="select-line">
+        <input type="checkbox" checked={selected} onChange={onToggle} />
+        <strong>{suggestion.name}</strong>
+        {typeof score === 'number' && (
+          <span className={`scout-score ${qualityClass(research?.status)}`}>{score}/100</span>
+        )}
+      </label>
+      <div className="suggestion-meta">
+        <span>{suggestion.category}</span>
+        <span>{[suggestion.city, suggestion.country].filter(Boolean).join(', ')}</span>
+        <span>Fit {suggestion.brandFit}</span>
+        <span>{suggestion.confidence}% KI-Konfidenz</span>
+      </div>
+      <p>{suggestion.rationale}</p>
+      {verification && (
+        <dl className="scout-verification">
+          <VerifyRow label="Anschrift" field={verification.address} />
+          <VerifyRow label="Website" field={verification.website} />
+          <VerifyRow label="Kontaktseite" field={verification.contactPage} />
+          <VerifyRow label="E-Mail" field={verification.email} />
+          <VerifyRow label="Telefon" field={verification.phone} />
+          <VerifyRow label="Ansprechpartner" field={verification.contactPerson} />
+        </dl>
+      )}
+      {research && research.warnings.length > 0 && (
+        <div className="scout-warnings">
+          {research.warnings.slice(0, 3).map((warning) => (
+            <small key={warning}>⚠ {warning}</small>
+          ))}
+        </div>
+      )}
+      <div className="source-list">
+        {suggestion.sources.map((source) => (
+          <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+            {source.title || source.url}
+          </a>
+        ))}
+      </div>
+    </article>
+  )
+}
+
+function VerifyRow({ label, field }: { label: string; field: VerifiedField }) {
+  return (
+    <div className="scout-verify-row">
+      <dt>{label}</dt>
+      <dd>
+        <span>{field.value}</span>
+        <span className={`verify-pill ${field.status}`}>
+          {verifyLabel(field.status)} · {field.confidence}%
+        </span>
+      </dd>
+    </div>
+  )
+}
+
+function verifyLabel(status: VerifiedField['status']): string {
+  if (status === 'verified') return 'verifiziert'
+  if (status === 'partial') return 'teilweise'
+  return 'offen'
+}
+
+function qualityClass(status: ResearchQualityStatus | undefined): string {
+  return status ?? ''
 }
 
 function BulkImportView({ onImport }: { onImport: (records: Manufactory[]) => void | Promise<void> }) {

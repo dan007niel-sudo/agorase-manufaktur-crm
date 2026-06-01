@@ -29,6 +29,10 @@ vi.mock('./api/mockupsApi', () => ({
   generateMockup: vi.fn(),
 }))
 
+vi.mock('./api/creativeApi', () => ({
+  generateDropConcepts: vi.fn(async () => []),
+}))
+
 const baseRecord: Manufactory = {
   id: 'atelier-nordwear',
   name: 'Atelier Nordwear',
@@ -73,33 +77,35 @@ describe('App', () => {
     vi.clearAllMocks()
   })
 
-  it('boots into the Sourcing tab', () => {
+  it('boots into the Mockup Studio tab', () => {
     render(<App />)
 
-    const sourcingTab = screen.getByRole('tab', { name: 'Sourcing' })
-    expect(sourcingTab.getAttribute('aria-selected')).toBe('true')
+    const mockupsTab = screen.getByRole('tab', { name: 'Mockups' })
+    expect(mockupsTab.getAttribute('aria-selected')).toBe('true')
   })
 
-  it('shows topbar filters on Sourcing and Partners, hides them on Mockups', async () => {
+  it('shows topbar filters only on Partners; hides them on the other three tabs', async () => {
     render(<App />)
 
-    // Sourcing tab (default): filters visible
-    expect(screen.getByPlaceholderText('Suche nach Name, Kategorie, Stadt, Quelle')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Neuer Kontakt' })).toBeTruthy()
-
-    fireEvent.click(screen.getByRole('tab', { name: 'Mockups' }))
-
-    await waitFor(() => {
-      expect(screen.queryByPlaceholderText('Suche nach Name, Kategorie, Stadt, Quelle')).toBeNull()
-    })
+    // Default tab is Mockup Studio → filters hidden.
+    expect(screen.queryByPlaceholderText('Suche nach Name, Kategorie, Stadt, Quelle')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Neuer Kontakt' })).toBeNull()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Partners' }))
-
     await waitFor(() => {
       expect(screen.getByPlaceholderText('Suche nach Name, Kategorie, Stadt, Quelle')).toBeTruthy()
     })
     expect(screen.getByRole('button', { name: 'Neuer Kontakt' })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Scout' }))
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText('Suche nach Name, Kategorie, Stadt, Quelle')).toBeNull()
+    })
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Creative' }))
+    await waitFor(() => {
+      expect(screen.queryByPlaceholderText('Suche nach Name, Kategorie, Stadt, Quelle')).toBeNull()
+    })
   })
 
   it('closes an open contact modal after navigating to another section', () => {
@@ -109,7 +115,7 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Neuer Kontakt' }))
     expect(screen.getByText(/Fashion-Kontakt/)).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Sourcing' }))
+    fireEvent.click(screen.getByRole('tab', { name: 'Mockups' }))
 
     expect(screen.queryByText(/Fashion-Kontakt/)).toBeNull()
   })
@@ -117,5 +123,16 @@ describe('App', () => {
   it('renders a logout button in the topbar', () => {
     render(<App />)
     expect(screen.getByRole('button', { name: 'Abmelden' })).toBeTruthy()
+  })
+
+  it('lists all four tabs in RHE order', () => {
+    render(<App />)
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      'Mockups',
+      'Creative',
+      'Scout',
+      'Partners',
+    ])
   })
 })

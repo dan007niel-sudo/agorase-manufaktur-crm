@@ -56,10 +56,10 @@ describe('AppShell', () => {
     expect(getByText('Kategorie')).toBeTruthy()
     expect(getByText('Status')).toBeTruthy()
 
-    fireEvent.click(getByText('Sourcing'))
+    fireEvent.click(getByText('Scout'))
     fireEvent.click(getByText('Neuer Kontakt'))
 
-    expect(onSelect).toHaveBeenCalledWith('Sourcing')
+    expect(onSelect).toHaveBeenCalledWith('ManufakturScout')
     expect(onAdd).toHaveBeenCalled()
   })
 
@@ -67,7 +67,7 @@ describe('AppShell', () => {
     const noop = vi.fn()
     const { container } = render(
       <AppShell
-        activeSection="Mockups"
+        activeSection="MockupStudio"
         openTasks={0}
         query=""
         categoryFilter="Alle"
@@ -87,7 +87,7 @@ describe('AppShell', () => {
     const tablist = container.querySelector('[role="tablist"]') as HTMLElement
     expect(tablist).toBeTruthy()
     const tabs = tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-    expect(tabs.length).toBe(3)
+    expect(tabs.length).toBe(4)
     const selected = Array.from(tabs).find((tab) => tab.getAttribute('aria-selected') === 'true')
     expect(selected?.textContent).toBe('Mockups')
   })
@@ -96,7 +96,7 @@ describe('AppShell', () => {
     const noop = vi.fn()
     const { queryByPlaceholderText, queryByText, getByRole } = render(
       <AppShell
-        activeSection="Mockups"
+        activeSection="MockupStudio"
         openTasks={0}
         query=""
         categoryFilter="Alle"
@@ -123,7 +123,7 @@ describe('AppShell', () => {
     const noop = vi.fn()
     const { getByRole } = render(
       <AppShell
-        activeSection="Sourcing"
+        activeSection="ManufakturScout"
         openTasks={0}
         query=""
         categoryFilter="Alle"
@@ -201,9 +201,9 @@ describe('AppShell', () => {
     const { container, getByText } = renderShell(onSelect)
     const trigger = container.querySelector('.drawer-trigger') as HTMLButtonElement
     fireEvent.click(trigger)
-    fireEvent.click(getByText('Sourcing'))
+    fireEvent.click(getByText('Scout'))
     const sidebar = container.querySelector('.sidebar') as HTMLElement
-    expect(onSelect).toHaveBeenCalledWith('Sourcing')
+    expect(onSelect).toHaveBeenCalledWith('ManufakturScout')
     expect(sidebar.getAttribute('data-drawer-open')).toBe('false')
     expect(trigger.getAttribute('aria-expanded')).toBe('false')
   })

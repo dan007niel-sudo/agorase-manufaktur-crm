@@ -268,6 +268,19 @@ create table if not exists mockup_jobs (
 
 alter table mockup_jobs add column if not exists reference_images jsonb not null default '[]'::jsonb;
 
+-- Phase 6 (RHE feature parity): per-product-mode prompt fields + structured quality report.
+alter table mockup_jobs add column if not exists product_mode text not null default '';
+alter table mockup_jobs add column if not exists image_mode text not null default '';
+alter table mockup_jobs add column if not exists garment_color text not null default '';
+alter table mockup_jobs add column if not exists fabric text not null default '';
+alter table mockup_jobs add column if not exists print_method text not null default '';
+alter table mockup_jobs add column if not exists placement text not null default '';
+alter table mockup_jobs add column if not exists design_text text not null default '';
+alter table mockup_jobs add column if not exists typography_preset text not null default '';
+alter table mockup_jobs add column if not exists typography_freeform text not null default '';
+alter table mockup_jobs add column if not exists print_fields jsonb not null default '{}'::jsonb;
+alter table mockup_jobs add column if not exists quality_report jsonb;
+
 create index if not exists mockup_jobs_status_idx on mockup_jobs (status);
 create index if not exists mockup_jobs_brief_id_idx on mockup_jobs (brief_id);
 create index if not exists mockup_jobs_release_id_idx on mockup_jobs (release_id);

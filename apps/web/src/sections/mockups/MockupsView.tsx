@@ -2,12 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   MOCKUP_ALLOWED_REFERENCE_MIME_TYPES,
   MOCKUP_ASPECT_RATIOS,
+  MOCKUP_IMAGE_MODES,
   MOCKUP_MAX_REFERENCES,
   MOCKUP_MAX_REFERENCE_BYTES,
+  MOCKUP_PRODUCT_MODES,
   MOCKUP_QUALITIES,
   MOCKUP_REFERENCE_KINDS,
   type MockupAspectRatio,
+  type MockupImageMode,
   type MockupJob,
+  type MockupPrintFields,
+  type MockupProductMode,
   type MockupQuality,
   type MockupReference,
   type MockupReferenceKind,
@@ -19,6 +24,7 @@ import {
   listMockupJobs,
 } from '../../api/mockupsApi'
 import { PanelHeader } from '../../components/Panel'
+import { TYPOGRAPHY_DIRECTIONS, TYPOGRAPHY_PRESETS, type TypographyPreset } from './typography'
 
 const QUALITY_LABELS: Record<MockupQuality, string> = {
   draft: 'Entwurf',
@@ -38,7 +44,14 @@ const REFERENCE_KIND_LABELS: Record<MockupReferenceKind, string> = {
   reference: 'Referenz',
 }
 
-export function MockupsView() {
+// Props let a sibling tab (Creative Lab) seed the Mockup-Studio prompt without losing tab state.
+// Calling `onPromptConsumed` clears the parent's "pending" prompt so it does not re-apply.
+export interface MockupsViewProps {
+  pendingPrompt?: string
+  onPromptConsumed?: () => void
+}
+
+export function MockupsView({ pendingPrompt, onPromptConsumed }: MockupsViewProps = {}) {
   const [jobs, setJobs] = useState<MockupJob[]>([])
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
@@ -51,6 +64,41 @@ export function MockupsView() {
   const [running, setRunning] = useState(false)
   const [selectedJobId, setSelectedJobId] = useState('')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // RHE-style fashion-spec fields
+  const [productMode, setProductMode] = useState<MockupProductMode | ''>('')
+  const [imageMode, setImageMode] = useState<MockupImageMode | ''>('')
+  const [garmentColor, setGarmentColor] = useState('')
+  const [fabric, setFabric] = useState('')
+  const [printMethod, setPrintMethod] = useState('')
+  const [placement, setPlacement] = useState('')
+  const [designText, setDesignText] = useState('')
+  const [typographyPreset, setTypographyPreset] = useState<TypographyPreset | ''>('')
+  const [typographyFreeform, setTypographyFreeform] = useState('')
+  const [printFields, setPrintFields] = useState<MockupPrintFields>({
+    front: '',
+    back: '',
+    sleeve: '',
+    printSizeCm: '',
+  })
+
+  // Cross-tab prompt handoff (Creative Lab → Mockup Studio). React 19 / react-hooks lint
+  // forbids both setState-in-effect and ref mutation during render. The clean pattern is
+  // `useState` with a "last seen prop" tracker stored as plain state — when the prop
+  // changes between renders, React calls setState during render (allowed) and immediately
+  // re-renders with the new value, no effect needed.
+  const [lastSeenPrompt, setLastSeenPrompt] = useState(pendingPrompt ?? '')
+  if (pendingPrompt && pendingPrompt !== lastSeenPrompt) {
+    setLastSeenPrompt(pendingPrompt)
+    if (pendingPrompt.trim() && pendingPrompt !== prompt) {
+      setPrompt(pendingPrompt)
+    }
+  }
+  useEffect(() => {
+    if (pendingPrompt && pendingPrompt === lastSeenPrompt && pendingPrompt.trim()) {
+      onPromptConsumed?.()
+    }
+  }, [pendingPrompt, lastSeenPrompt, onPromptConsumed])
 
   const sortedJobs = useMemo(
     () => [...jobs].sort((a, b) => (b.createdAt > a.createdAt ? 1 : -1)),
@@ -100,6 +148,16 @@ export function MockupsView() {
         quality,
         notes: notes.trim() || undefined,
         reference_images: references.length ? references : undefined,
+        product_mode: productMode || undefined,
+        image_mode: imageMode || undefined,
+        garment_color: garmentColor.trim() || undefined,
+        fabric: fabric.trim() || undefined,
+        print_method: printMethod.trim() || undefined,
+        placement: placement.trim() || undefined,
+        design_text: designText.trim() || undefined,
+        typography_preset: typographyPreset || undefined,
+        typography_freeform: typographyFreeform.trim() || undefined,
+        print_fields: printFields,
       })
       setJobs((current) => upsertJob(current, response.job))
       setSelectedJobId(response.job.id)
@@ -215,6 +273,148 @@ export function MockupsView() {
         {error && <div className="error-box">{error}</div>}
         <div className="creative-lab-panel">
           <h3>Neues Mockup</h3>
+          <div>
+            <span className="field-label">Produkt</span>
+            <div className="creative-lab-filters">
+              {MOCKUP_PRODUCT_MODES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={value === productMode ? 'chip selected' : 'chip'}
+                  aria-pressed={value === productMode}
+                  onClick={() => setProductMode(value === productMode ? '' : value)}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <span className="field-label">Bildmodus</span>
+            <div className="creative-lab-filters">
+              {MOCKUP_IMAGE_MODES.map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={value === imageMode ? 'chip selected' : 'chip'}
+                  aria-pressed={value === imageMode}
+                  onClick={() => setImageMode(value === imageMode ? '' : value)}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="form-grid two">
+            <label>
+              Garment-Farbe
+              <input
+                value={garmentColor}
+                onChange={(event) => setGarmentColor(event.target.value)}
+                placeholder="z. B. Washed Black"
+              />
+            </label>
+            <label>
+              Print-Verfahren
+              <input
+                value={printMethod}
+                onChange={(event) => setPrintMethod(event.target.value)}
+                placeholder="z. B. Screenprint, DTG, Stickerei"
+              />
+            </label>
+          </div>
+          <label>
+            Stoff / GSM
+            <input
+              value={fabric}
+              onChange={(event) => setFabric(event.target.value)}
+              placeholder="z. B. 420 GSM brushed cotton fleece"
+            />
+          </label>
+          <label>
+            Placement
+            <input
+              value={placement}
+              onChange={(event) => setPlacement(event.target.value)}
+              placeholder="z. B. linke Brust + grosser Rueckenprint"
+            />
+          </label>
+          <label>
+            Design-Text
+            <input
+              value={designText}
+              onChange={(event) => setDesignText(event.target.value)}
+              placeholder="Exakter Text, z. B. KINGS DON'T RUN"
+            />
+          </label>
+          <div>
+            <span className="field-label">Typografie-Preset</span>
+            <div className="creative-lab-filters">
+              {TYPOGRAPHY_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={preset === typographyPreset ? 'chip selected' : 'chip'}
+                  aria-pressed={preset === typographyPreset}
+                  onClick={() => {
+                    if (preset === typographyPreset) {
+                      setTypographyPreset('')
+                      setTypographyFreeform('')
+                    } else {
+                      setTypographyPreset(preset)
+                      setTypographyFreeform(TYPOGRAPHY_DIRECTIONS[preset])
+                    }
+                  }}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label>
+            Typografie-Direction
+            <input
+              value={typographyFreeform}
+              onChange={(event) => setTypographyFreeform(event.target.value)}
+              placeholder="z. B. bold condensed streetwear lettering, uppercase"
+            />
+          </label>
+          <div className="form-grid two">
+            <label>
+              Print Front
+              <input
+                value={printFields.front}
+                onChange={(event) => setPrintFields((current) => ({ ...current, front: event.target.value }))}
+                placeholder="z. B. 10 cm Höhe, links Brust"
+              />
+            </label>
+            <label>
+              Print Back
+              <input
+                value={printFields.back}
+                onChange={(event) => setPrintFields((current) => ({ ...current, back: event.target.value }))}
+                placeholder="z. B. 30 cm Höhe, zentriert"
+              />
+            </label>
+          </div>
+          <div className="form-grid two">
+            <label>
+              Print Ärmel
+              <input
+                value={printFields.sleeve}
+                onChange={(event) => setPrintFields((current) => ({ ...current, sleeve: event.target.value }))}
+                placeholder="optional"
+              />
+            </label>
+            <label>
+              Print-Grösse (cm)
+              <input
+                value={printFields.printSizeCm}
+                onChange={(event) => setPrintFields((current) => ({ ...current, printSizeCm: event.target.value }))}
+                placeholder="z. B. 30 × 40"
+              />
+            </label>
+          </div>
           <label>
             Prompt
             <textarea
@@ -364,6 +564,9 @@ export function MockupsView() {
                 <strong>{job.prompt.slice(0, 80) || 'Ohne Prompt'}</strong>
                 <span>{STATUS_LABELS[job.status]}</span>
                 <small>{`${job.aspectRatio} · ${QUALITY_LABELS[job.quality]}`}</small>
+                {job.qualityReport && (
+                  <small>{`Score ${job.qualityReport.score}/100`}</small>
+                )}
                 {job.referenceImages.length > 0 && (
                   <div className="mockup-reference-strip">
                     {job.referenceImages.slice(0, MOCKUP_MAX_REFERENCES).map((ref) => (
@@ -462,6 +665,37 @@ function MockupDetail({
           </div>
         </div>
       )}
+      {job.qualityReport && (
+        <div className="mockup-quality-report">
+          <div className="mockup-quality-header">
+            <strong>{job.qualityReport.score}/100</strong>
+            <span className={`quality-badge ${job.qualityReport.status}`}>
+              {job.qualityReport.status === 'ready'
+                ? 'verwendbar'
+                : job.qualityReport.status === 'blocked'
+                  ? 'blockiert'
+                  : 'prüfen'}
+            </span>
+          </div>
+          <p>{job.qualityReport.summary}</p>
+          {job.qualityReport.checks.length > 0 && (
+            <ul className="mockup-quality-checks">
+              {job.qualityReport.checks.slice(0, 5).map((check) => (
+                <li key={check.label}>
+                  <span className={`check-dot ${check.status}`} aria-hidden="true" />
+                  <strong>{check.label}</strong>
+                  <small>{check.note}</small>
+                </li>
+              ))}
+            </ul>
+          )}
+          {job.qualityReport.recommendations.length > 0 && (
+            <small>Empfehlung: {job.qualityReport.recommendations.join(' · ')}</small>
+          )}
+        </div>
+      )}
+      {job.productMode && <small>Produkt: {job.productMode}</small>}
+      {job.imageMode && <small>Bildmodus: {job.imageMode}</small>}
       {job.referenceNotes && <small>Referenzen: {job.referenceNotes}</small>}
       <small>Seitenverhältnis: {job.aspectRatio}</small>
       <small>Qualität: {QUALITY_LABELS[job.quality]}</small>

@@ -440,4 +440,112 @@ describe('creative routes', () => {
     expect(sentPrompt).toContain('capsule SS27')
     expect(context.promptTemplatesRepository.get).toHaveBeenCalledWith('tmpl-1')
   })
+
+  // ---- Drop concept generator (RHE Creative Lab) ----
+
+  it('rejects unauthenticated drop concept requests', async () => {
+    const response = await handleRequest(
+      new Request('http://localhost/api/creative/concepts', {
+        method: 'POST',
+        body: JSON.stringify({ theme: 'capsule' }),
+      }),
+      fullContext(),
+    )
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects drop concept requests without a theme', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const response = await handleRequest(
+      new Request('http://localhost/api/creative/concepts', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ theme: '   ' }),
+      }),
+      context,
+    )
+    expect(response.status).toBe(400)
+  })
+
+  it('returns 503 when GEMINI_API_KEY is missing for drop concepts', async () => {
+    const context = fullContext()
+    const response = await handleRequest(
+      new Request('http://localhost/api/creative/concepts', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ theme: 'Spring capsule' }),
+      }),
+      context,
+    )
+    expect(response.status).toBe(503)
+  })
+
+  it('generates drop concepts and returns Mockup-Studio-ready prompts', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const aiPayload = JSON.stringify({
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                text:
+                  '[{"title":"Quiet Spring","story":"Soft layers.","heroPiece":"Oversized Shirt","palette":["bone","sage"],"printDirection":"minimal","mockupPrompt":"Oversized shirt mockup, bone color, sage embroidery, studio light, 4:5","productionNotes":["240gsm cotton"]}]',
+              },
+            ],
+          },
+        },
+      ],
+    })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(aiPayload, { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/creative/concepts', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({
+          theme: 'Spring capsule',
+          productMode: 'Oversized Shirt',
+          tone: 'quiet, premium',
+        }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { concepts: Array<{ title: string; mockupPrompt: string }> }
+    expect(body.concepts).toHaveLength(1)
+    expect(body.concepts[0]).toMatchObject({
+      title: 'Quiet Spring',
+      mockupPrompt: expect.stringContaining('Oversized shirt mockup'),
+    })
+
+    const text = JSON.stringify(body)
+    expect(text).not.toContain('test-secret')
+    expect(text).not.toContain('googleapis.com')
+  })
+
+  it('sanitizes provider 500s on drop concepts', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: { message: 'leak AIzaFAKE googleapis.com' } }),
+        { status: 500 },
+      ),
+    )
+    const response = await handleRequest(
+      new Request('http://localhost/api/creative/concepts', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({ theme: 'Spring' }),
+      }),
+      context,
+    )
+    expect(response.status).toBe(502)
+    const text = await response.text()
+    expect(text).toContain('creative_concept_failed')
+    expect(text).not.toContain('AIzaFAKE')
+    expect(text).not.toContain('googleapis.com')
+  })
 })

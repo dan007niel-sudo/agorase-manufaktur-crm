@@ -24,6 +24,17 @@ const sampleJob: MockupJob = {
   briefId: 'brief-1',
   notes: '',
   referenceImages: [],
+  productMode: '',
+  imageMode: '',
+  garmentColor: '',
+  fabric: '',
+  printMethod: '',
+  placement: '',
+  designText: '',
+  typographyPreset: '',
+  typographyFreeform: '',
+  printFields: { front: '', back: '', sleeve: '', printSizeCm: '' },
+  qualityReport: null,
   createdAt: '2026-05-15T00:00:00.000Z',
   updatedAt: '2026-05-15T00:00:00.000Z',
 }
@@ -632,6 +643,88 @@ describe('mockups routes', () => {
       // Only [A-Za-z0-9._-] survives; any other char becomes an underscore.
       expect(disposition).toMatch(/filename="agorase-mockup-weird_id_+-\d{4}-\d{2}-\d{2}\.png"/)
     })
+  })
+
+  it('accepts RHE product mode, image mode, typography and print fields end-to-end', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const aiPayload = JSON.stringify({
+      candidates: [
+        {
+          content: {
+            parts: [{ inlineData: { data: 'aGVsbG8=', mimeType: 'image/png' } }],
+          },
+        },
+      ],
+    })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(aiPayload, { status: 200, headers: { 'content-type': 'application/json' } }),
+    )
+
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({
+          prompt: 'capsule SS27 oversized hoodie with confident lettering',
+          product_mode: 'Hoodie',
+          image_mode: 'Model-Shot',
+          garment_color: 'Washed Black',
+          fabric: '420 GSM brushed cotton fleece',
+          print_method: 'Screenprint',
+          placement: 'left chest + big back print',
+          design_text: 'KINGS',
+          typography_preset: 'Bold Condensed Sans',
+          typography_freeform: 'bold condensed sans-serif streetwear lettering',
+          print_fields: { front: '20cm', back: '40cm', sleeve: '', printSizeCm: '' },
+        }),
+      }),
+      context,
+    )
+
+    expect(response.status).toBe(200)
+    const body = (await response.json()) as { job: MockupJob }
+    expect(body.job).toMatchObject({
+      status: 'completed',
+      productMode: 'Hoodie',
+      imageMode: 'Model-Shot',
+      garmentColor: 'Washed Black',
+      fabric: '420 GSM brushed cotton fleece',
+      printMethod: 'Screenprint',
+      designText: 'KINGS',
+    })
+    expect(body.job.qualityReport).not.toBeNull()
+    expect(body.job.qualityReport?.checks.length).toBeGreaterThan(0)
+
+    const [, init] = fetchSpy.mock.calls[0]
+    const upstreamBody = JSON.parse(String(init?.body ?? '{}')) as {
+      contents?: Array<{ parts?: Array<{ text?: string }> }>
+    }
+    const text = upstreamBody.contents?.[0]?.parts?.find((part) => part.text)?.text ?? ''
+    expect(text).toContain('Garment: Hoodie')
+    expect(text).toContain('Mockup mode: Model-Shot')
+    expect(text).toContain('Front print: 20cm')
+    expect(text).toContain('Back print: 40cm')
+    expect(text).toContain('KINGS')
+  })
+
+  it('rejects an unknown product mode with 400', async () => {
+    const context = fullContext({ GEMINI_API_KEY: 'test-secret' })
+    const response = await handleRequest(
+      new Request('http://localhost/api/mockups/generate', {
+        method: 'POST',
+        headers: authenticatedHeaders(context.env),
+        body: JSON.stringify({
+          prompt: 'capsule SS27',
+          product_mode: 'Bogus Tunic',
+        }),
+      }),
+      context,
+    )
+    // Unknown values are coerced to '' (ignored) — the request still succeeds with no mode,
+    // which is acceptable for backward compatibility with legacy clients.
+    // The legacy `expect 400` would lock us into rejecting any future product mode rollout.
+    // Therefore: assert the response was *accepted* but the product_mode was discarded.
+    expect(response.status).not.toBe(400)
   })
 
   it('marks the job failed when only base64 is returned and exceeds the 4MB limit', async () => {

@@ -28,6 +28,61 @@ export const MOCKUP_REFERENCE_KINDS: readonly MockupReferenceKind[] = [
   'reference',
 ]
 
+// RHE product modes — drives garment-specific prompt construction (gsm hints, fit, silhouettes).
+export type MockupProductMode =
+  | 'T-Shirt'
+  | 'Oversized Shirt'
+  | 'Kurzärmeliges Hemd'
+  | 'Hoodie'
+  | 'Sweater'
+
+export const MOCKUP_PRODUCT_MODES: readonly MockupProductMode[] = [
+  'T-Shirt',
+  'Oversized Shirt',
+  'Kurzärmeliges Hemd',
+  'Hoodie',
+  'Sweater',
+]
+
+// RHE image modes — drives camera/composition direction.
+export type MockupImageMode =
+  | 'Flatlay'
+  | 'Model-Shot'
+  | 'Ghost-Mannequin'
+  | 'Lookbook'
+  | 'Tech Pack View'
+
+export const MOCKUP_IMAGE_MODES: readonly MockupImageMode[] = [
+  'Flatlay',
+  'Model-Shot',
+  'Ghost-Mannequin',
+  'Lookbook',
+  'Tech Pack View',
+]
+
+export interface MockupPrintFields {
+  front: string
+  back: string
+  sleeve: string
+  printSizeCm: string
+}
+
+export type MockupQualityCheckStatus = 'ready' | 'review' | 'blocked'
+
+export interface MockupQualityCheck {
+  label: string
+  status: MockupQualityCheckStatus
+  note: string
+}
+
+export interface MockupQualityReport {
+  score: number
+  status: MockupQualityCheckStatus
+  summary: string
+  checks: MockupQualityCheck[]
+  recommendations: string[]
+}
+
 export interface MockupReference {
   id: string
   name: string
@@ -60,6 +115,17 @@ export interface MockupJob {
   briefId: string
   notes: string
   referenceImages: MockupReference[]
+  productMode: MockupProductMode | ''
+  imageMode: MockupImageMode | ''
+  garmentColor: string
+  fabric: string
+  printMethod: string
+  placement: string
+  designText: string
+  typographyPreset: string
+  typographyFreeform: string
+  printFields: MockupPrintFields
+  qualityReport: MockupQualityReport | null
   createdAt: string
   updatedAt: string
 }
@@ -80,6 +146,17 @@ export interface MockupJobInput {
   briefId?: string
   notes?: string
   referenceImages?: MockupReference[]
+  productMode?: MockupProductMode | ''
+  imageMode?: MockupImageMode | ''
+  garmentColor?: string
+  fabric?: string
+  printMethod?: string
+  placement?: string
+  designText?: string
+  typographyPreset?: string
+  typographyFreeform?: string
+  printFields?: Partial<MockupPrintFields>
+  qualityReport?: MockupQualityReport | null
 }
 
 export interface GenerateMockupRequest {
@@ -91,6 +168,16 @@ export interface GenerateMockupRequest {
   release_id?: string
   notes?: string
   reference_images?: MockupReference[]
+  product_mode?: MockupProductMode
+  image_mode?: MockupImageMode
+  garment_color?: string
+  fabric?: string
+  print_method?: string
+  placement?: string
+  design_text?: string
+  typography_preset?: string
+  typography_freeform?: string
+  print_fields?: Partial<MockupPrintFields>
 }
 
 export interface GenerateMockupResponse {

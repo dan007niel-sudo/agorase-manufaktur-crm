@@ -3,12 +3,16 @@ import type {
   BrainstormResponse,
   CreativeBrief,
   CreativeDirection,
+  DropConcept,
+  DropConceptRequest,
+  DropConceptResponse,
   PromptTemplate,
 } from '@agorase/shared'
 import type { ApiEnv } from '../env.js'
 import type { CreativeBriefListFilters } from '../db/creativeBriefsRepository.js'
 import type { CreativeDirectionListFilters } from '../db/creativeDirectionsRepository.js'
 import { errorResponse, HttpError, jsonResponse, readJson, resolveOrigin, safeHttpError } from '../http.js'
+import { toText, toTextArray } from '../lib/quality.js'
 
 export interface CreativeBriefsRepository {
   list(filters?: CreativeBriefListFilters): Promise<CreativeBrief[]>
@@ -45,6 +49,10 @@ export async function creativeRoute(request: Request, env: ApiEnv, repositories:
   try {
     if (pathname === '/api/creative/brainstorm' && request.method === 'POST') {
       return await handleBrainstorm(request, env, repositories, origin)
+    }
+
+    if (pathname === '/api/creative/concepts' && request.method === 'POST') {
+      return await handleDropConcepts(request, env, origin)
     }
 
     if (pathname === '/api/creative/briefs' || pathname.startsWith('/api/creative/briefs/')) {
@@ -411,4 +419,84 @@ function pickList(value: unknown): string {
 function clampCount(value: number) {
   if (!Number.isFinite(value)) return 3
   return Math.max(1, Math.min(6, Math.floor(value)))
+}
+
+// ---------------------------------------------------------------------------
+// Drop concept generator (RHE Creative Lab)
+// ---------------------------------------------------------------------------
+
+async function handleDropConcepts(request: Request, env: ApiEnv, origin: string) {
+  const body = await readJson<Partial<DropConceptRequest>>(request)
+  const theme = typeof body.theme === 'string' ? body.theme.trim() : ''
+  const productMode = typeof body.productMode === 'string' ? body.productMode.trim() : ''
+  const tone = typeof body.tone === 'string' ? body.tone.trim() : ''
+  if (!theme) {
+    return errorResponse('invalid_concept_request', 'Theme is required.', 400, origin)
+  }
+  if (!env.geminiApiKey) {
+    return errorResponse('creative_not_configured', 'AI provider is not configured.', 503, origin)
+  }
+
+  const prompt = buildDropConceptPrompt({ theme, productMode, tone })
+  let providerText: string
+  try {
+    providerText = await callGeminiForBrainstorm(env, prompt)
+  } catch {
+    // Always re-label provider failures so the UI sees the concept-specific code, and never
+    // leaks the upstream message (which can contain API keys or URLs).
+    throw new HttpError(
+      'creative_concept_failed',
+      'Drop concept provider is temporarily unavailable.',
+      502,
+    )
+  }
+
+  const concepts = parseDropConcepts(providerText)
+  const response: DropConceptResponse = { concepts, model: env.geminiTextModel }
+  return jsonResponse(response, 200, origin)
+}
+
+export function buildDropConceptPrompt(input: { theme: string; productMode: string; tone: string }) {
+  return [
+    'Du bist Creative Director für eine kuratierte Streetwear/Ready-to-Wear Brand.',
+    'Erstelle drei konkrete Drop-Konzepte für moderne, tragbare Mode.',
+    `Thema: ${input.theme}.`,
+    `Hero-Piece: ${input.productMode || 'Oversized Shirt'}.`,
+    `Ton: ${input.tone || 'clean, direct, premium, kein Kitsch'}.`,
+    'Jedes Konzept braucht: title, story, heroPiece, palette (Array), printDirection, mockupPrompt, productionNotes (Array).',
+    'Die Mockup-Prompts müssen echte Fashion-Mockups erzeugen können: Stoff, Fit, Licht, Print-Platzierung, Kamera, Hintergrund.',
+    'Antworte nur als JSON Array.',
+  ].join('\n')
+}
+
+export function parseDropConcepts(rawText: string): DropConcept[] {
+  const trimmed = (rawText ?? '').trim()
+  if (!trimmed) return []
+  const stripped = stripJsonFences(trimmed)
+  const firstBracket = stripped.indexOf('[')
+  const lastBracket = stripped.lastIndexOf(']')
+  const json = firstBracket >= 0 && lastBracket > firstBracket
+    ? stripped.slice(firstBracket, lastBracket + 1)
+    : stripped
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(json)
+  } catch {
+    return []
+  }
+  const items = Array.isArray(parsed) ? parsed : []
+  return items.map((item) => normalizeDropConcept(item))
+}
+
+function normalizeDropConcept(value: unknown): DropConcept {
+  const data = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return {
+    title: toText(data.title, 'Untitled Drop'),
+    story: toText(data.story, ''),
+    heroPiece: toText(data.heroPiece, 'Oversized Shirt'),
+    palette: toTextArray(data.palette),
+    printDirection: toText(data.printDirection, ''),
+    mockupPrompt: toText(data.mockupPrompt, ''),
+    productionNotes: toTextArray(data.productionNotes),
+  }
 }
