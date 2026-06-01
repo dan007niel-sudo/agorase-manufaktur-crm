@@ -6,24 +6,19 @@ import {
   MOCKUP_MAX_REFERENCE_BYTES,
   MOCKUP_QUALITIES,
   MOCKUP_REFERENCE_KINDS,
-  type CreativeBrief,
-  type FashionRelease,
   type MockupAspectRatio,
   type MockupJob,
   type MockupQuality,
   type MockupReference,
   type MockupReferenceKind,
 } from '@agorase/shared'
-import { listCreativeBriefs } from '../../api/creativeApi'
 import {
   deleteMockupJob,
   downloadMockupJob,
   generateMockup,
   listMockupJobs,
 } from '../../api/mockupsApi'
-import { listReleases } from '../../api/releasesApi'
 import { PanelHeader } from '../../components/Panel'
-import type { FashionOsModule } from '../../fashionOs'
 
 const QUALITY_LABELS: Record<MockupQuality, string> = {
   draft: 'Entwurf',
@@ -43,18 +38,14 @@ const REFERENCE_KIND_LABELS: Record<MockupReferenceKind, string> = {
   reference: 'Referenz',
 }
 
-export function MockupsView({ module }: { module: FashionOsModule }) {
+export function MockupsView() {
   const [jobs, setJobs] = useState<MockupJob[]>([])
-  const [briefs, setBriefs] = useState<CreativeBrief[]>([])
-  const [releases, setReleases] = useState<FashionRelease[]>([])
   const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState('')
   const [prompt, setPrompt] = useState('')
   const [referenceNotes, setReferenceNotes] = useState('')
   const [aspectRatio, setAspectRatio] = useState<MockupAspectRatio>('1:1')
   const [quality, setQuality] = useState<MockupQuality>('standard')
-  const [briefId, setBriefId] = useState('')
-  const [releaseId, setReleaseId] = useState('')
   const [notes, setNotes] = useState('')
   const [references, setReferences] = useState<MockupReference[]>([])
   const [running, setRunning] = useState(false)
@@ -73,15 +64,9 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
 
     async function load() {
       try {
-        const [loadedJobs, loadedBriefs, loadedReleases] = await Promise.all([
-          listMockupJobs(),
-          listCreativeBriefs(),
-          listReleases(),
-        ])
+        const loadedJobs = await listMockupJobs()
         if (!active) return
         setJobs(loadedJobs)
-        setBriefs(loadedBriefs)
-        setReleases(loadedReleases)
         setSelectedJobId((current) => current || loadedJobs[0]?.id || '')
         setLoadStatus('ready')
         setError('')
@@ -113,8 +98,6 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
         reference_notes: referenceNotes.trim() || undefined,
         aspect_ratio: aspectRatio,
         quality,
-        brief_id: briefId || undefined,
-        release_id: releaseId || undefined,
         notes: notes.trim() || undefined,
         reference_images: references.length ? references : undefined,
       })
@@ -227,7 +210,7 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
   return (
     <section className={layoutClassName}>
       <aside className="creative-lab-workspace panel">
-        <PanelHeader title={module.label} />
+        <PanelHeader title="Mockups" />
         {loadStatus === 'loading' && <div className="empty-state">Mockups werden geladen.</div>}
         {error && <div className="error-box">{error}</div>}
         <div className="creative-lab-panel">
@@ -349,30 +332,6 @@ export function MockupsView({ module }: { module: FashionOsModule }) {
                 ))}
               </div>
             </div>
-          </div>
-          <div className="form-grid two">
-            <label>
-              Brief
-              <select value={briefId} onChange={(event) => setBriefId(event.target.value)}>
-                <option value="">Ohne Brief</option>
-                {briefs.map((brief) => (
-                  <option key={brief.id} value={brief.id}>
-                    {brief.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Release
-              <select value={releaseId} onChange={(event) => setReleaseId(event.target.value)}>
-                <option value="">Ohne Release</option>
-                {releases.map((release) => (
-                  <option key={release.id} value={release.id}>
-                    {release.name}
-                  </option>
-                ))}
-              </select>
-            </label>
           </div>
           <label>
             Notizen

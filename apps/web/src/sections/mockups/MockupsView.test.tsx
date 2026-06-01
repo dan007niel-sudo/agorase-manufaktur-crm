@@ -11,17 +11,8 @@ vi.mock('../../api/mockupsApi', () => ({
   downloadMockupJob: vi.fn(async () => undefined),
   generateMockup: vi.fn(),
 }))
-vi.mock('../../api/creativeApi', () => ({
-  listCreativeBriefs: vi.fn(async () => []),
-}))
-vi.mock('../../api/releasesApi', () => ({
-  listReleases: vi.fn(async () => []),
-}))
 
-import { fashionOsModules } from '../../fashionOs'
 import { MockupsView } from './MockupsView'
-
-const mockupsModule = fashionOsModules.find((m) => m.section === 'Mockups')!
 
 function makePngFile(name: string): File {
   const bytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
@@ -87,7 +78,7 @@ function makeJob(overrides: Partial<MockupJob> = {}): MockupJob {
 describe('MockupsView layout collapse on empty history', () => {
   it('renders only the workspace column when no jobs exist', async () => {
     listMockupJobsMock.mockResolvedValueOnce([])
-    render(<MockupsView module={mockupsModule} />)
+    render(<MockupsView />)
 
     await waitFor(() => {
       expect(document.querySelector('.creative-lab-workspace')).not.toBeNull()
@@ -100,7 +91,7 @@ describe('MockupsView layout collapse on empty history', () => {
 
   it('renders the three-column layout when at least one job exists', async () => {
     listMockupJobsMock.mockResolvedValueOnce([makeJob()])
-    render(<MockupsView module={mockupsModule} />)
+    render(<MockupsView />)
 
     await waitFor(() => {
       expect(document.querySelector('.creative-lab-list')).not.toBeNull()
@@ -114,7 +105,7 @@ describe('MockupsView layout collapse on empty history', () => {
 
 describe('MockupsView reference reordering', () => {
   it('disables up on the first item and down on the last item', async () => {
-    const { container } = render(<MockupsView module={mockupsModule} />)
+    const { container } = render(<MockupsView />)
     const input = container.querySelector<HTMLInputElement>(
       'input[aria-label="Referenzbild hinzufügen"]',
     )!
@@ -133,7 +124,7 @@ describe('MockupsView reference reordering', () => {
   })
 
   it('moves a reference down when its down button is clicked', async () => {
-    const { container } = render(<MockupsView module={mockupsModule} />)
+    const { container } = render(<MockupsView />)
     const input = container.querySelector<HTMLInputElement>(
       'input[aria-label="Referenzbild hinzufügen"]',
     )!
@@ -147,7 +138,7 @@ describe('MockupsView reference reordering', () => {
   })
 
   it('moves a reference up when its up button is clicked', async () => {
-    const { container } = render(<MockupsView module={mockupsModule} />)
+    const { container } = render(<MockupsView />)
     const input = container.querySelector<HTMLInputElement>(
       'input[aria-label="Referenzbild hinzufügen"]',
     )!

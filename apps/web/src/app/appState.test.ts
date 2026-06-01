@@ -54,7 +54,6 @@ describe('appState helpers', () => {
   it('shows topbar filters only in sourcing and partners sections', () => {
     expect(isTopbarFilterSection('Sourcing')).toBe(true)
     expect(isTopbarFilterSection('Partners')).toBe(true)
-    expect(isTopbarFilterSection('Command Center')).toBe(false)
-    expect(isTopbarFilterSection('Settings')).toBe(false)
+    expect(isTopbarFilterSection('Mockups')).toBe(false)
   })
 })
