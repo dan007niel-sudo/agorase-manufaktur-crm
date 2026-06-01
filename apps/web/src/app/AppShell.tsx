@@ -1,15 +1,12 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useState, type KeyboardEvent, type ReactNode } from 'react'
 import logo from '../assets/agorase-logo.jpeg'
-import { fashionOsModules, type FashionOsModule } from '../fashionOs'
+import { fashionOsModules, type FashionOsModule, type FashionOsSection } from '../fashionOs'
 import { categories, pipelineStatuses, type Category, type PipelineStatus } from '../types'
-
-type Section = FashionOsModule['section']
 
 const DESKTOP_QUERY = '(min-width: 981px)'
 
 export function AppShell({
   activeSection,
-  activeModule,
   openTasks,
   query,
   categoryFilter,
@@ -21,21 +18,22 @@ export function AppShell({
   onCategoryChange,
   onStatusChange,
   onAdd,
+  onLogout,
   children,
 }: {
-  activeSection: Section
-  activeModule: FashionOsModule
+  activeSection: FashionOsSection
   openTasks: number
   query: string
   categoryFilter: 'Alle' | Category
   statusFilter: 'Alle' | PipelineStatus
   alert?: string
   filtersVisible: boolean
-  onSectionChange: (section: Section) => void
+  onSectionChange: (section: FashionOsSection) => void
   onQueryChange: (value: string) => void
   onCategoryChange: (value: 'Alle' | Category) => void
   onStatusChange: (value: 'Alle' | PipelineStatus) => void
   onAdd: () => void
+  onLogout: () => void | Promise<void>
   children: ReactNode
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -43,7 +41,7 @@ export function AppShell({
   const closeDrawer = useCallback(() => setDrawerOpen(false), [])
 
   const handleSectionChange = useCallback(
-    (section: Section) => {
+    (section: FashionOsSection) => {
       onSectionChange(section)
       setDrawerOpen(false)
     },
@@ -52,7 +50,7 @@ export function AppShell({
 
   useEffect(() => {
     if (!drawerOpen) return
-    const onKeyDown = (event: KeyboardEvent) => {
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === 'Escape') setDrawerOpen(false)
     }
     document.addEventListener('keydown', onKeyDown)
@@ -81,6 +79,9 @@ export function AppShell({
     return undefined
   }, [])
 
+  const activeModule =
+    fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
+
   return (
     <div className="app-shell">
       <header className="mobile-header">
@@ -96,7 +97,7 @@ export function AppShell({
         </button>
         <div className="mobile-header-brand">
           <strong>AGORASE</strong>
-          <span>Fashion OS</span>
+          <span>Manufaktur CRM</span>
         </div>
       </header>
       <Sidebar
@@ -124,6 +125,7 @@ export function AppShell({
           onCategoryChange={onCategoryChange}
           onStatusChange={onStatusChange}
           onAdd={onAdd}
+          onLogout={onLogout}
         />
         {alert && <div className="app-alert">{alert}</div>}
         {children}
@@ -139,19 +141,34 @@ function Sidebar({
   drawerOpen,
   onCloseDrawer,
 }: {
-  activeSection: Section
+  activeSection: FashionOsSection
   metrics: number
-  onSelect: (section: Section) => void
+  onSelect: (section: FashionOsSection) => void
   drawerOpen: boolean
   onCloseDrawer: () => void
 }) {
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Home' && event.key !== 'End') {
+      return
+    }
+    event.preventDefault()
+    const currentIndex = fashionOsModules.findIndex((module) => module.section === activeSection)
+    if (currentIndex < 0) return
+    let nextIndex = currentIndex
+    if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % fashionOsModules.length
+    if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + fashionOsModules.length) % fashionOsModules.length
+    if (event.key === 'Home') nextIndex = 0
+    if (event.key === 'End') nextIndex = fashionOsModules.length - 1
+    onSelect(fashionOsModules[nextIndex].section)
+  }
+
   return (
     <aside className="sidebar" data-drawer-open={drawerOpen ? 'true' : 'false'}>
       <div className="brand-block">
         <img src={logo} alt="Agorase Logo" />
         <div>
           <strong>AGORASE</strong>
-          <span>Fashion OS</span>
+          <span>Manufaktur CRM</span>
         </div>
         <button
           type="button"
@@ -162,23 +179,40 @@ function Sidebar({
           <span aria-hidden="true">×</span>
         </button>
       </div>
-      <nav id="primary-navigation" className="side-nav" aria-label="Fashion OS Bereiche">
-        {fashionOsModules.map((module) => (
-          <button
-            key={module.section}
-            className={activeSection === module.section ? 'active' : ''}
-            type="button"
-            aria-current={activeSection === module.section ? 'page' : undefined}
-            onClick={() => onSelect(module.section)}
-          >
-            <span>{module.shortLabel}</span>
-          </button>
-        ))}
+      <nav
+        id="primary-navigation"
+        className="side-nav"
+        role="tablist"
+        aria-orientation="vertical"
+        aria-label="Fashion OS Bereiche"
+      >
+        {fashionOsModules.map((module) => {
+          const selected = activeSection === module.section
+          const panelId = `tabpanel-${module.section.toLowerCase()}`
+          const tabId = `tab-${module.section.toLowerCase()}`
+          return (
+            <button
+              key={module.section}
+              id={tabId}
+              className={selected ? 'active' : ''}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls={panelId}
+              aria-current={selected ? 'page' : undefined}
+              tabIndex={selected ? 0 : -1}
+              onClick={() => onSelect(module.section)}
+              onKeyDown={handleKeyDown}
+            >
+              <span>{module.shortLabel}</span>
+            </button>
+          )
+        })}
       </nav>
       <div className="today-label">
         <span>Heute</span>
         <strong>{metrics}</strong>
-        <small>offene OS-Schritte</small>
+        <small>offene Schritte</small>
       </div>
     </aside>
   )
@@ -194,6 +228,7 @@ function Topbar({
   onCategoryChange,
   onStatusChange,
   onAdd,
+  onLogout,
 }: {
   activeModule: FashionOsModule
   query: string
@@ -204,53 +239,86 @@ function Topbar({
   onCategoryChange: (value: 'Alle' | Category) => void
   onStatusChange: (value: 'Alle' | PipelineStatus) => void
   onAdd: () => void
+  onLogout: () => void | Promise<void>
 }) {
   return (
     <header className={filtersVisible ? 'topbar' : 'topbar topbar--solo'}>
       <div>
-        <span className="label">Fashion OS / {activeModule.label}</span>
+        <span className="label">Agorase Manufaktur CRM / {activeModule.label}</span>
         <h1>{activeModule.label}</h1>
         <p className="topbar-summary">{activeModule.summary}</p>
       </div>
-      {filtersVisible && (
-        <div className="topbar-actions">
-          <label className="topbar-field">
-            <span className="field-label">Suche</span>
-            <input
-              value={query}
-              onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Suche nach Name, Kategorie, Stadt, Quelle"
-            />
-          </label>
-          <label className="topbar-field">
-            <span className="field-label">Kategorie</span>
-            <select
-              value={categoryFilter}
-              onChange={(event) => onCategoryChange(event.target.value as 'Alle' | Category)}
-            >
-              <option>Alle</option>
-              {categories.map((category) => (
-                <option key={category}>{category}</option>
-              ))}
-            </select>
-          </label>
-          <label className="topbar-field">
-            <span className="field-label">Status</span>
-            <select
-              value={statusFilter}
-              onChange={(event) => onStatusChange(event.target.value as 'Alle' | PipelineStatus)}
-            >
-              <option>Alle</option>
-              {pipelineStatuses.map((status) => (
-                <option key={status}>{status}</option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className="primary-button" onClick={onAdd}>
-            Neuer Kontakt
-          </button>
-        </div>
-      )}
+      <div className="topbar-actions">
+        {filtersVisible && (
+          <>
+            <label className="topbar-field">
+              <span className="field-label">Suche</span>
+              <input
+                value={query}
+                onChange={(event) => onQueryChange(event.target.value)}
+                placeholder="Suche nach Name, Kategorie, Stadt, Quelle"
+              />
+            </label>
+            <label className="topbar-field">
+              <span className="field-label">Kategorie</span>
+              <select
+                value={categoryFilter}
+                onChange={(event) => onCategoryChange(event.target.value as 'Alle' | Category)}
+              >
+                <option>Alle</option>
+                {categories.map((category) => (
+                  <option key={category}>{category}</option>
+                ))}
+              </select>
+            </label>
+            <label className="topbar-field">
+              <span className="field-label">Status</span>
+              <select
+                value={statusFilter}
+                onChange={(event) => onStatusChange(event.target.value as 'Alle' | PipelineStatus)}
+              >
+                <option>Alle</option>
+                {pipelineStatuses.map((status) => (
+                  <option key={status}>{status}</option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="primary-button" onClick={onAdd}>
+              Neuer Kontakt
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          className="logout-button"
+          aria-label="Abmelden"
+          title="Abmelden"
+          onClick={() => void onLogout()}
+        >
+          <LogOutIcon />
+        </button>
+      </div>
     </header>
+  )
+}
+
+function LogOutIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      focusable="false"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
   )
 }

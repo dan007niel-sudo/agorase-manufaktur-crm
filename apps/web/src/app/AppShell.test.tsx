@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fashionOsModules } from '../fashionOs'
 import { AppShell } from './AppShell'
 
 describe('AppShell', () => {
@@ -28,11 +27,11 @@ describe('AppShell', () => {
     const onCategoryChange = vi.fn()
     const onStatusChange = vi.fn()
     const onAdd = vi.fn()
+    const onLogout = vi.fn()
 
     const { container, getByText, getByPlaceholderText } = render(
       <AppShell
         activeSection="Partners"
-        activeModule={fashionOsModules[2]}
         openTasks={3}
         query="atelier"
         categoryFilter="Alle"
@@ -43,6 +42,7 @@ describe('AppShell', () => {
         onCategoryChange={onCategoryChange}
         onStatusChange={onStatusChange}
         onAdd={onAdd}
+        onLogout={onLogout}
         alert="Partnerdaten konnten nicht synchronisiert werden."
       >
         <section>Partner content</section>
@@ -63,12 +63,11 @@ describe('AppShell', () => {
     expect(onAdd).toHaveBeenCalled()
   })
 
-  it('hides the filter actions when filtersVisible is false', () => {
+  it('marks the active tab with aria-selected', () => {
     const noop = vi.fn()
-    const { queryByPlaceholderText, queryByText } = render(
+    const { container } = render(
       <AppShell
-        activeSection="Settings"
-        activeModule={fashionOsModules[9]}
+        activeSection="Mockups"
         openTasks={0}
         query=""
         categoryFilter="Alle"
@@ -79,13 +78,70 @@ describe('AppShell', () => {
         onCategoryChange={noop}
         onStatusChange={noop}
         onAdd={noop}
+        onLogout={noop}
       >
-        <section>Settings content</section>
+        <section>Mockups content</section>
+      </AppShell>,
+    )
+
+    const tablist = container.querySelector('[role="tablist"]') as HTMLElement
+    expect(tablist).toBeTruthy()
+    const tabs = tablist.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+    expect(tabs.length).toBe(3)
+    const selected = Array.from(tabs).find((tab) => tab.getAttribute('aria-selected') === 'true')
+    expect(selected?.textContent).toBe('Mockups')
+  })
+
+  it('hides the filter actions when filtersVisible is false but keeps logout', () => {
+    const noop = vi.fn()
+    const { queryByPlaceholderText, queryByText, getByRole } = render(
+      <AppShell
+        activeSection="Mockups"
+        openTasks={0}
+        query=""
+        categoryFilter="Alle"
+        statusFilter="Alle"
+        filtersVisible={false}
+        onSectionChange={noop}
+        onQueryChange={noop}
+        onCategoryChange={noop}
+        onStatusChange={noop}
+        onAdd={noop}
+        onLogout={noop}
+      >
+        <section>Mockups content</section>
       </AppShell>,
     )
 
     expect(queryByPlaceholderText('Suche nach Name, Kategorie, Stadt, Quelle')).toBeNull()
     expect(queryByText('Neuer Kontakt')).toBeNull()
+    expect(getByRole('button', { name: 'Abmelden' })).toBeTruthy()
+  })
+
+  it('calls onLogout when the logout button is clicked', () => {
+    const onLogout = vi.fn()
+    const noop = vi.fn()
+    const { getByRole } = render(
+      <AppShell
+        activeSection="Sourcing"
+        openTasks={0}
+        query=""
+        categoryFilter="Alle"
+        statusFilter="Alle"
+        filtersVisible={false}
+        onSectionChange={noop}
+        onQueryChange={noop}
+        onCategoryChange={noop}
+        onStatusChange={noop}
+        onAdd={noop}
+        onLogout={onLogout}
+      >
+        <section>content</section>
+      </AppShell>,
+    )
+
+    fireEvent.click(getByRole('button', { name: 'Abmelden' }))
+    expect(onLogout).toHaveBeenCalled()
   })
 
   function renderShell(onSelect = vi.fn()) {
@@ -93,7 +149,6 @@ describe('AppShell', () => {
     return render(
       <AppShell
         activeSection="Partners"
-        activeModule={fashionOsModules[2]}
         openTasks={1}
         query=""
         categoryFilter="Alle"
@@ -104,6 +159,7 @@ describe('AppShell', () => {
         onCategoryChange={noop}
         onStatusChange={noop}
         onAdd={noop}
+        onLogout={noop}
       >
         <section>Partner content</section>
       </AppShell>,

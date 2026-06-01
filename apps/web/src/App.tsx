@@ -2,78 +2,43 @@ import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 import { AppShell } from './app/AppShell'
 import { AuthGate } from './app/AuthGate'
-import { formatLocalDate, isTopbarFilterSection, selectVisibleRecord } from './app/appState'
+import { isTopbarFilterSection, selectVisibleRecord } from './app/appState'
 import {
   resetStoredStateFromQuery,
   useAdminAuth,
   type RecordsStatus,
 } from './app/authState'
 import { RecordForm } from './components/FormControls'
-import { seedManufactories } from './data'
-import { calculateMetrics, createEmptyManufacture, deriveTasks, upsertManufacture } from './crmUtils'
-import { fashionOsModules, type FashionOsModule } from './fashionOs'
-import { listCreativeBriefs, listCreativeDirections } from './api/creativeApi'
-import { listLegalNotes } from './api/legalApi'
-import { listMockupJobs } from './api/mockupsApi'
+import { createEmptyManufacture, upsertManufacture } from './crmUtils'
+import type { FashionOsSection } from './fashionOs'
 import { deletePartner, importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
-import { listProductionProfiles } from './api/productionApi'
-import { listReleases, listReleaseTasks } from './api/releasesApi'
-import { listTasks, saveTask } from './api/tasksApi'
-import { listWebOpsItems } from './api/webOpsApi'
-import { CommandCenter } from './sections/command/CommandCenter'
-import { CreativeLabView } from './sections/creativeLab/CreativeLabView'
-import { createCreativeCommandTasks } from './sections/creativeLab/creativeTasks'
-import { LegalView } from './sections/legal/LegalView'
-import { createLegalCommandTasks } from './sections/legal/legalTasks'
 import { MockupsView } from './sections/mockups/MockupsView'
-import { createMockupCommandTasks } from './sections/mockups/mockupTasks'
 import { PartnersView } from './sections/partners/PartnersView'
-import { ProductionView } from './sections/production/ProductionView'
-import { ReleasesView } from './sections/releases/ReleasesView'
-import { createReleaseLaunchTasks } from './sections/releases/releaseTasks'
-import { SettingsView } from './sections/settings/SettingsView'
 import { SourcingView } from './sections/sourcing/SourcingView'
-import { WebOpsView } from './sections/webOps/WebOpsView'
-import { createWebOpsCommandTasks } from './sections/webOps/webOpsTasks'
-import type {
-  CreativeBrief,
-  CreativeDirection,
-  FashionRelease,
-  LegalNote,
-  MockupJob,
-  OperationalTask,
-  ProductionProfile,
-  ReleaseTask,
-  WebOpsItem,
-} from '@agorase/shared'
-import type { Category, CrmTask, Manufactory, PipelineStatus } from './types'
-
-type Section = FashionOsModule['section']
+import type { Category, Manufactory, PipelineStatus } from './types'
 
 function App() {
   resetStoredStateFromQuery()
 
   const { authStatus, authError, handleLogin, handleLogout } = useAdminAuth()
-  const [activeSection, setActiveSection] = useState<Section>('Command Center')
+
+  // Tab state — single source of truth for which view is visible.
+  const [activeSection, setActiveSection] = useState<FashionOsSection>('Sourcing')
+
+  // Partners cluster — owned here because Sourcing imports records into the same store.
   const [records, setRecords] = useState<Manufactory[]>([])
   const [recordsStatus, setRecordsStatus] = useState<RecordsStatus>('loading')
   const [recordsError, setRecordsError] = useState('')
-  const [persistedTasks, setPersistedTasks] = useState<OperationalTask[]>([])
-  const [productionProfiles, setProductionProfiles] = useState<ProductionProfile[]>([])
-  const [releases, setReleases] = useState<FashionRelease[]>([])
-  const [releaseTasks, setReleaseTasks] = useState<ReleaseTask[]>([])
-  const [webOpsItems, setWebOpsItems] = useState<WebOpsItem[]>([])
-  const [creativeBriefs, setCreativeBriefs] = useState<CreativeBrief[]>([])
-  const [creativeDirections, setCreativeDirections] = useState<CreativeDirection[]>([])
-  const [mockupJobs, setMockupJobs] = useState<MockupJob[]>([])
-  const [legalNotes, setLegalNotes] = useState<LegalNote[]>([])
-  const [selectedId, setSelectedId] = useState(records[0]?.id ?? '')
+  const [selectedId, setSelectedId] = useState('')
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<'Alle' | Category>('Alle')
   const [statusFilter, setStatusFilter] = useState<'Alle' | PipelineStatus>('Alle')
   const [formOpen, setFormOpen] = useState(false)
 
-  const selectedRecord = records.find((record) => record.id === selectedId) ?? records[0]
+  // Sourcing and Mockups own their internal state inside their views (RHE pattern).
+  // All three views are permanently mounted and toggled via the `hidden`
+  // attribute so internal state survives tab switches.
+
   const filteredRecords = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
     return records.filter((record) => {
@@ -98,37 +63,8 @@ function App() {
     })
   }, [records, query, categoryFilter, statusFilter])
 
-  const now = new Date()
-  const today = formatLocalDate(now)
-  const metrics = calculateMetrics(records, today)
-  const persistedTasksById = useMemo(() => new Map(persistedTasks.map((task) => [task.id, task])), [persistedTasks])
-  const tasks = deriveTasks(records, today)
-    .map((task) => ({
-      ...task,
-      completed: persistedTasksById.get(task.id)?.status === 'done',
-    }))
-    .concat(createProductionBlockerTasks(productionProfiles, records, persistedTasksById))
-    .concat(createReleaseLaunchTasks(releaseTasks, persistedTasksById, today))
-    .concat(createWebOpsCommandTasks(webOpsItems, persistedTasksById, today))
-    .concat(
-      createCreativeCommandTasks({
-        briefs: creativeBriefs,
-        directions: creativeDirections,
-        releases,
-        persistedTasksById,
-        today,
-      }),
-    )
-    .concat(
-      createMockupCommandTasks({
-        jobs: mockupJobs,
-        persistedTasksById,
-        now: new Date().toISOString(),
-      }),
-    )
-    .concat(createLegalCommandTasks(legalNotes, persistedTasksById, today))
-  const openTaskCount = tasks.filter((task) => !task.completed).length
-  const activeModule = fashionOsModules.find((module) => module.section === activeSection) ?? fashionOsModules[0]
+  const selectedRecord = records.find((record) => record.id === selectedId) ?? records[0]
+  const selectedPartnerRecord = selectVisibleRecord(filteredRecords, selectedId)
   const filtersVisible = isTopbarFilterSection(activeSection)
 
   useEffect(() => {
@@ -143,44 +79,6 @@ function App() {
         setSelectedId((current) => current || loaded[0]?.id || '')
         setRecordsStatus('ready')
         setRecordsError('')
-        try {
-          const [
-            loadedTasks,
-            loadedProfiles,
-            loadedReleases,
-            loadedReleaseTasks,
-            loadedWebOpsItems,
-            loadedCreativeBriefs,
-            loadedCreativeDirections,
-            loadedMockupJobs,
-            loadedLegalNotes,
-          ] = await Promise.all([
-            listTasks(),
-            listProductionProfiles(),
-            listReleases(),
-            listReleaseTasks(),
-            listWebOpsItems(),
-            listCreativeBriefs(),
-            listCreativeDirections(),
-            listMockupJobs(),
-            listLegalNotes(),
-          ])
-          if (active) {
-            setPersistedTasks(loadedTasks)
-            setProductionProfiles(loadedProfiles)
-            setReleases(loadedReleases)
-            setReleaseTasks(loadedReleaseTasks)
-            setWebOpsItems(loadedWebOpsItems)
-            setCreativeBriefs(loadedCreativeBriefs)
-            setCreativeDirections(loadedCreativeDirections)
-            setMockupJobs(loadedMockupJobs)
-            setLegalNotes(loadedLegalNotes)
-          }
-        } catch (caught) {
-          if (!active) return
-          setRecordsError(caught instanceof Error ? caught.message : 'Tasks konnten nicht geladen werden.')
-          setRecordsStatus('error')
-        }
       } catch (caught) {
         if (!active) return
         setRecords([])
@@ -208,8 +106,6 @@ function App() {
       setRecordsError(caught instanceof Error ? caught.message : 'Partner konnte nicht gespeichert werden.')
     }
   }
-
-  const selectedPartnerRecord = selectVisibleRecord(filteredRecords, selectedId)
 
   async function updateRecord(id: string, patch: Partial<Manufactory>) {
     try {
@@ -257,33 +153,7 @@ function App() {
     }
   }
 
-  async function saveSeedRecords() {
-    try {
-      const saved = await importPartners(seedManufactories)
-      setRecords(saved)
-      setSelectedId(saved[0]?.id ?? '')
-      setRecordsStatus('ready')
-      setRecordsError('')
-    } catch (caught) {
-      setRecordsStatus('error')
-      setRecordsError(caught instanceof Error ? caught.message : 'Seed-Daten konnten nicht gespeichert werden.')
-    }
-  }
-
-  async function toggleTask(task: CrmTask) {
-    const nextTask = toOperationalTask(task, persistedTasksById.get(task.id))
-    try {
-      const saved = await saveTask({ ...nextTask, status: task.completed ? 'open' : 'done' })
-      setPersistedTasks((current) => upsertTask(current, saved))
-      setRecordsStatus('ready')
-      setRecordsError('')
-    } catch (caught) {
-      setRecordsError(caught instanceof Error ? caught.message : 'Task konnte nicht gespeichert werden.')
-      setRecordsStatus('error')
-    }
-  }
-
-  function changeSection(section: Section) {
+  function changeSection(section: FashionOsSection) {
     setActiveSection(section)
     setFormOpen(false)
   }
@@ -292,8 +162,7 @@ function App() {
     <AuthGate status={authStatus} error={authError} onLogin={handleLogin}>
       <AppShell
         activeSection={activeSection}
-        activeModule={activeModule}
-        openTasks={openTaskCount}
+        openTasks={0}
         query={query}
         categoryFilter={categoryFilter}
         statusFilter={statusFilter}
@@ -306,23 +175,27 @@ function App() {
           setSelectedId('')
           setFormOpen(true)
         }}
-        alert={recordsStatus === 'error' ? 'Partnerdaten konnten nicht synchronisiert werden.' : undefined}
+        onLogout={handleLogout}
+        alert={
+          recordsStatus === 'error'
+            ? recordsError || 'Partnerdaten konnten nicht synchronisiert werden.'
+            : undefined
+        }
       >
-        {activeSection === 'Command Center' && (
-          <CommandCenter
-            metrics={metrics}
-            records={records}
-            tasks={tasks}
-            now={now}
-            onSelectRecord={setSelectedId}
-            onSectionChange={changeSection}
-            onToggleTask={toggleTask}
-          />
-        )}
-        {activeSection === 'Sourcing' && (
+        <div
+          id="tabpanel-sourcing"
+          role="tabpanel"
+          aria-labelledby="tab-sourcing"
+          hidden={activeSection !== 'Sourcing'}
+        >
           <SourcingView onAiImport={saveImportedRecords} onBulkImport={saveImportedRecords} />
-        )}
-        {activeSection === 'Partners' && (
+        </div>
+        <div
+          id="tabpanel-partners"
+          role="tabpanel"
+          aria-labelledby="tab-partners"
+          hidden={activeSection !== 'Partners'}
+        >
           <PartnersView
             records={filteredRecords}
             selectedRecord={selectedPartnerRecord}
@@ -336,28 +209,15 @@ function App() {
             }}
             onDelete={removeRecord}
           />
-        )}
-        {activeSection === 'Production' && (
-          <ProductionView module={activeModule} records={filteredRecords} onSelect={setSelectedId} onPatch={saveRecord} />
-        )}
-        {activeSection === 'Creative Lab' && <CreativeLabView module={activeModule} />}
-        {activeSection === 'Mockups' && <MockupsView module={activeModule} />}
-        {activeSection === 'Legal Orientation' && <LegalView module={activeModule} />}
-        {activeSection === 'Releases' && <ReleasesView module={activeModule} records={filteredRecords} />}
-        {activeSection === 'Web Ops' && <WebOpsView module={activeModule} />}
-        {activeSection === 'Settings' && (
-          <SettingsView
-            status={
-              recordsStatus === 'error'
-                ? recordsError
-                : recordsStatus === 'loading'
-                  ? 'Partnerdaten werden geladen.'
-                  : 'Partnerdaten werden über die API synchronisiert.'
-            }
-            onSeedSave={saveSeedRecords}
-            onLogout={handleLogout}
-          />
-        )}
+        </div>
+        <div
+          id="tabpanel-mockups"
+          role="tabpanel"
+          aria-labelledby="tab-mockups"
+          hidden={activeSection !== 'Mockups'}
+        >
+          <MockupsView />
+        </div>
       </AppShell>
       {formOpen && (
         <RecordForm
@@ -368,49 +228,6 @@ function App() {
       )}
     </AuthGate>
   )
-}
-
-function createProductionBlockerTasks(
-  profiles: ProductionProfile[],
-  records: Manufactory[],
-  persistedTasksById: Map<string, OperationalTask>,
-): CrmTask[] {
-  return profiles
-    .filter((profile) => profile.readinessStatus === 'blocked' && profile.blocker)
-    .map((profile) => {
-      const record = records.find((item) => item.id === profile.partnerId)
-      const id = `${profile.partnerId}-production-blocker`
-      return {
-        id,
-        manufactureId: profile.partnerId,
-        title: `Production Blocker: ${record?.name ?? profile.partnerId}`,
-        dueDate: '',
-        urgency: 'today' as const,
-        completed: persistedTasksById.get(id)?.status === 'done',
-      }
-    })
-}
-
-function toOperationalTask(task: CrmTask, existing?: OperationalTask): OperationalTask {
-  const now = new Date().toISOString()
-  return {
-    id: task.id,
-    title: task.title,
-    section: 'Command Center',
-    status: existing?.status ?? (task.completed ? 'done' : 'open'),
-    priority: task.urgency === 'upcoming' ? 'medium' : 'high',
-    partnerId: task.manufactureId,
-    dueDate: task.dueDate,
-    notes: existing?.notes ?? '',
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-  }
-}
-
-function upsertTask(tasks: OperationalTask[], nextTask: OperationalTask) {
-  return tasks.some((task) => task.id === nextTask.id)
-    ? tasks.map((task) => (task.id === nextTask.id ? nextTask : task))
-    : [...tasks, nextTask]
 }
 
 export default App

@@ -1,7 +1,5 @@
 import type { Manufactory } from '../types'
-import type { FashionOsModule } from '../fashionOs'
-
-type Section = FashionOsModule['section']
+import type { FashionOsSection } from '../fashionOs'
 
 export function formatLocalDate(date: Date) {
   const year = date.getFullYear()
@@ -14,6 +12,6 @@ export function selectVisibleRecord(records: Manufactory[], selectedId: string) 
   return records.find((record) => record.id === selectedId) ?? records[0]
 }
 
-export function isTopbarFilterSection(section: Section) {
+export function isTopbarFilterSection(section: FashionOsSection) {
   return section === 'Sourcing' || section === 'Partners'
 }
