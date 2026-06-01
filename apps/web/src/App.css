@@ -1225,8 +1225,8 @@ label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   margin-left: 8px;
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -1235,10 +1235,14 @@ label {
   align-self: end;
 }
 
-.logout-button:hover,
-.logout-button:focus {
+.logout-button:hover {
   border-color: var(--ink);
-  outline: none;
+}
+
+.logout-button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-color: var(--ink);
 }
 
 .side-nav button[aria-selected='true'] {

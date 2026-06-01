@@ -1,9 +1,7 @@
 import type {
   Category,
-  CrmTask,
   FitScore,
   Manufactory,
-  Metrics,
   PipelineStatus,
   Potential,
   PriceLevel,
@@ -108,52 +106,11 @@ export function parseBulkImport(input: string): Manufactory[] {
   })
 }
 
-export function calculateMetrics(records: Manufactory[], today = isoToday()): Metrics {
-  const contactedStatuses: PipelineStatus[] = [
-    'Erstkontakt gesendet',
-    'Antwort erhalten',
-    'Gespräch geplant',
-    'Line Sheet / Samples angefragt',
-    'Kooperation in Prüfung',
-    'Aufgenommen',
-  ]
-
-  return {
-    total: records.length,
-    highFit: records.filter((record) => record.brandFit === 'A' || record.brandFit === 'A-').length,
-    highPotential: records.filter((record) => record.cooperationPotential === 'Hoch').length,
-    contacted: records.filter((record) => contactedStatuses.includes(record.status)).length,
-    dueFollowUps: records.filter((record) => record.nextFollowUp && record.nextFollowUp <= today).length,
-    openTasks: deriveTasks(records, today).length,
-  }
-}
-
-export function deriveTasks(records: Manufactory[], today = isoToday()): CrmTask[] {
-  return records
-    .filter((record) => record.nextStep || record.nextFollowUp)
-    .map((record) => ({
-      id: `${record.id}-task`,
-      manufactureId: record.id,
-      title: record.nextStep || `Follow-up mit ${record.name}`,
-      dueDate: record.nextFollowUp,
-      urgency: getUrgency(record.nextFollowUp, today),
-      completed: false,
-    }))
-    .sort((left, right) => (left.dueDate || '9999').localeCompare(right.dueDate || '9999'))
-}
-
 export function upsertManufacture(records: Manufactory[], nextRecord: Manufactory): Manufactory[] {
   const existingIndex = records.findIndex((record) => record.id === nextRecord.id)
   if (existingIndex === -1) return [...records, nextRecord]
 
   return records.map((record, index) => (index === existingIndex ? nextRecord : record))
-}
-
-export function groupByStatus(records: Manufactory[]) {
-  return pipelineStatuses.map((status) => ({
-    status,
-    records: records.filter((record) => record.status === status),
-  }))
 }
 
 function splitRow(row: string, separator: string) {
@@ -215,15 +172,4 @@ function safeOneOf<T extends string>(value: string, allowed: readonly T[], fallb
 function uniqueId(name: string, index: number) {
   const slug = slugify(name)
   return `${slug || 'fashion-kontakt'}-${index + 1}`
-}
-
-function getUrgency(date: string, today: string): CrmTask['urgency'] {
-  if (!date) return 'upcoming'
-  if (date < today) return 'overdue'
-  if (date === today) return 'today'
-  return 'upcoming'
-}
-
-function isoToday() {
-  return new Date().toISOString().slice(0, 10)
 }

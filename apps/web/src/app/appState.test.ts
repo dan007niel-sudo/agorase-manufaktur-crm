@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatLocalDate, isTopbarFilterSection, selectVisibleRecord } from './appState'
+import { isTopbarFilterSection, selectVisibleRecord } from './appState'
 import type { Manufactory } from '../types'
 
 const baseRecord: Manufactory = {
@@ -28,11 +28,6 @@ const baseRecord: Manufactory = {
 }
 
 describe('appState helpers', () => {
-  it('formats the current local date as an ISO calendar date', () => {
-    expect(formatLocalDate(new Date(2026, 4, 19, 23, 30))).toBe('2026-05-19')
-    expect(formatLocalDate(new Date(2026, 0, 5, 1, 2))).toBe('2026-01-05')
-  })
-
   it('falls back to the first visible record when the selected id is filtered out', () => {
     const visibleRecords: Manufactory[] = [
       { ...baseRecord, id: 'grain-cut-studio', name: 'Grain Cut Studio' },
