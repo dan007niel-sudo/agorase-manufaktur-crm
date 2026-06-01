@@ -46,9 +46,10 @@ describe('appState helpers', () => {
     expect(selectVisibleRecord(visibleRecords, 'denim-yard')?.id).toBe('denim-yard')
   })
 
-  it('shows topbar filters only in sourcing and partners sections', () => {
-    expect(isTopbarFilterSection('Sourcing')).toBe(true)
+  it('shows topbar filters only in the partners section', () => {
     expect(isTopbarFilterSection('Partners')).toBe(true)
-    expect(isTopbarFilterSection('Mockups')).toBe(false)
+    expect(isTopbarFilterSection('MockupStudio')).toBe(false)
+    expect(isTopbarFilterSection('CreativeLab')).toBe(false)
+    expect(isTopbarFilterSection('ManufakturScout')).toBe(false)
   })
 })

@@ -2,9 +2,9 @@
 
 ## What is this project
 
-Private, admin-only Manufaktur-CRM für eine kuratierte Fashion-Brand. Drei fokussierte Module nach dem RHE-Single-Page-Pattern: **Sourcing → Partners → Mockups** (Recherche → Kontakt → Visualisierung). Kein Public-Storefront, kein Multi-Tenancy, kein Billing.
+Private, admin-only Manufaktur-CRM für eine kuratierte Fashion-Brand. Vier Module nach dem RHE-Fashion-Studio-Pattern: **Mockup Studio → Creative Lab → Manufaktur Scout → Partners**. Mockup Studio (Bildgenerierung mit 5 Produktmodi + Typografie + Print-Feldern), Creative Lab (Drop-Konzept-Generator), Manufaktur Scout (KI-Recherche mit Score + per-Field-Verifikation), Partners (CRM-Pipeline-Persistenz). Kein Public-Storefront, kein Multi-Tenancy, kein Billing.
 
-**History note:** Ursprünglich 10 Sektionen (Command Center, Sourcing, Partners, Production, Creative Lab, Mockups, Legal, Releases, Web Ops, Settings). Phase 5 (PR #1, Commit `f97c664`) hat das Frontend auf 3 Module reduziert. Backend-Routen + Tabellen für die 7 entfernten Module existieren noch (stiller Dead Code aus Frontend-Sicht), Cleanup steht als Folge-PR aus.
+**History note:** Ursprünglich 10 Sektionen (Command Center, Sourcing, Partners, Production, Creative Lab, Mockups, Legal, Releases, Web Ops, Settings). Phase 5 (PR #1, Commit `f97c664`) reduzierte das Frontend auf 3 Module (Sourcing/Partners/Mockups). Phase 6 (Feature-Parity zu RHE Fashion Studio) hat die heutige 4-Modul-Struktur mit RHE-Feature-Set eingeführt. Backend-Routen + Tabellen für ursprünglich gelöschte Module (Command, Production, Releases, Web Ops, Legal, Settings) existieren noch (stiller Dead Code), Cleanup steht als Folge-PR aus.
 
 ## Stack
 

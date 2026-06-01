@@ -1,12 +1,18 @@
 import {
   MOCKUP_ALLOWED_REFERENCE_MIME_TYPES,
   MOCKUP_ASPECT_RATIOS,
+  MOCKUP_IMAGE_MODES,
   MOCKUP_JOB_STATUSES,
   MOCKUP_MAX_REFERENCES,
   MOCKUP_MAX_REFERENCE_BYTES,
+  MOCKUP_PRODUCT_MODES,
   MOCKUP_QUALITIES,
   MOCKUP_REFERENCE_KINDS,
+  type MockupImageMode,
   type MockupJob,
+  type MockupPrintFields,
+  type MockupProductMode,
+  type MockupQualityReport,
   type MockupReference,
   type MockupReferenceKind,
 } from '@agorase/shared'
@@ -29,6 +35,17 @@ const columns = [
   'brief_id',
   'notes',
   'reference_images',
+  'product_mode',
+  'image_mode',
+  'garment_color',
+  'fabric',
+  'print_method',
+  'placement',
+  'design_text',
+  'typography_preset',
+  'typography_freeform',
+  'print_fields',
+  'quality_report',
 ] as const
 
 type Row = Record<string, unknown>
@@ -56,8 +73,83 @@ export function mapMockupJobRow(row: Row): MockupJob {
     briefId: text(row.brief_id),
     notes: text(row.notes),
     referenceImages: mapMockupReferencesValue(row.reference_images),
+    productMode: optionalEnum(row.product_mode, MOCKUP_PRODUCT_MODES),
+    imageMode: optionalEnum(row.image_mode, MOCKUP_IMAGE_MODES),
+    garmentColor: text(row.garment_color),
+    fabric: text(row.fabric),
+    printMethod: text(row.print_method),
+    placement: text(row.placement),
+    designText: text(row.design_text),
+    typographyPreset: text(row.typography_preset),
+    typographyFreeform: text(row.typography_freeform),
+    printFields: mapPrintFieldsValue(row.print_fields),
+    qualityReport: mapQualityReportValue(row.quality_report),
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
+  }
+}
+
+function optionalEnum<T extends string>(value: unknown, allowed: readonly T[]): T | '' {
+  if (typeof value !== 'string') return ''
+  return (allowed as readonly string[]).includes(value) ? (value as T) : ''
+}
+
+function mapPrintFieldsValue(value: unknown): MockupPrintFields {
+  const fallback: MockupPrintFields = { front: '', back: '', sleeve: '', printSizeCm: '' }
+  if (!value) return fallback
+  const raw = typeof value === 'string' ? safeJson(value) : value
+  if (!raw || typeof raw !== 'object') return fallback
+  const record = raw as Record<string, unknown>
+  return {
+    front: text(record.front),
+    back: text(record.back),
+    sleeve: text(record.sleeve),
+    printSizeCm: text(record.printSizeCm),
+  }
+}
+
+function mapQualityReportValue(value: unknown): MockupQualityReport | null {
+  if (!value) return null
+  const raw = typeof value === 'string' ? safeJson(value) : value
+  if (!raw || typeof raw !== 'object') return null
+  const record = raw as Record<string, unknown>
+  const score = Number(record.score)
+  if (!Number.isFinite(score)) return null
+  const status = record.status
+  const statusOk =
+    status === 'ready' || status === 'review' || status === 'blocked' ? status : 'review'
+  const checks: MockupQualityReport['checks'] = Array.isArray(record.checks)
+    ? record.checks
+        .filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+        .map((entry) => {
+          const status =
+            entry.status === 'ready' || entry.status === 'review' || entry.status === 'blocked'
+              ? (entry.status as 'ready' | 'review' | 'blocked')
+              : ('review' as const)
+          return {
+            label: typeof entry.label === 'string' ? entry.label : 'Quality Check',
+            status,
+            note: typeof entry.note === 'string' ? entry.note : '',
+          }
+        })
+    : []
+  const recommendations = Array.isArray(record.recommendations)
+    ? record.recommendations.filter((entry): entry is string => typeof entry === 'string')
+    : []
+  return {
+    score: Math.max(1, Math.min(100, Math.round(score))),
+    status: statusOk,
+    summary: typeof record.summary === 'string' ? record.summary : '',
+    checks,
+    recommendations,
+  }
+}
+
+function safeJson(value: string): unknown {
+  try {
+    return JSON.parse(value)
+  } catch {
+    return null
   }
 }
 
@@ -107,12 +199,56 @@ export function normalizeMockupJobInput(input: Partial<MockupJob>): MockupJob {
     briefId: text(input.briefId),
     notes: text(input.notes),
     referenceImages: validateReferenceImages(input.referenceImages),
+    productMode: optionalInputEnum<MockupProductMode>(
+      input.productMode,
+      MOCKUP_PRODUCT_MODES,
+      'Invalid mockup product mode.',
+    ),
+    imageMode: optionalInputEnum<MockupImageMode>(
+      input.imageMode,
+      MOCKUP_IMAGE_MODES,
+      'Invalid mockup image mode.',
+    ),
+    garmentColor: text(input.garmentColor),
+    fabric: text(input.fabric),
+    printMethod: text(input.printMethod),
+    placement: text(input.placement),
+    designText: text(input.designText),
+    typographyPreset: text(input.typographyPreset),
+    typographyFreeform: text(input.typographyFreeform),
+    printFields: normalizePrintFieldsInput(input.printFields),
+    qualityReport: input.qualityReport ?? null,
     createdAt: text(input.createdAt) || now,
     updatedAt: text(input.updatedAt) || now,
   }
   if (!value.id) throw new HttpError('invalid_mockup_job', 'Mockup job id is required.', 400)
   if (!value.prompt) throw new HttpError('invalid_mockup_job', 'Mockup prompt is required.', 400)
   return value
+}
+
+function optionalInputEnum<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+  message: string,
+): T | '' {
+  if (value === undefined || value === null || value === '') return ''
+  if (typeof value === 'string' && (allowed as readonly string[]).includes(value)) {
+    return value as T
+  }
+  throw new HttpError('invalid_mockup_job', message, 400)
+}
+
+function normalizePrintFieldsInput(value: unknown): MockupPrintFields {
+  if (!value || typeof value !== 'object') {
+    return { front: '', back: '', sleeve: '', printSizeCm: '' }
+  }
+  const record = value as Record<string, unknown>
+  return {
+    front: text(record.front),
+    back: text(record.back),
+    sleeve: text(record.sleeve),
+    printSizeCm: text(record.printSizeCm),
+  }
 }
 
 function validateReferenceImages(value: unknown): MockupReference[] {
@@ -215,6 +351,17 @@ export async function upsertMockupJob(pool: DbPool, input: Partial<MockupJob>): 
     job.briefId,
     job.notes,
     JSON.stringify(job.referenceImages),
+    job.productMode,
+    job.imageMode,
+    job.garmentColor,
+    job.fabric,
+    job.printMethod,
+    job.placement,
+    job.designText,
+    job.typographyPreset,
+    job.typographyFreeform,
+    JSON.stringify(job.printFields),
+    job.qualityReport ? JSON.stringify(job.qualityReport) : null,
   ]
   const placeholders = values.map((_, index) => `$${index + 1}`).join(', ')
   const updates = columns

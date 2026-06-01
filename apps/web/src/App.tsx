@@ -12,6 +12,7 @@ import { RecordForm } from './components/FormControls'
 import { createEmptyManufacture, upsertManufacture } from './crmUtils'
 import type { FashionOsSection } from './fashionOs'
 import { deletePartner, importPartners, listPartners, savePartner, updatePartner } from './api/partnersApi'
+import { CreativeLabView } from './sections/creativeLab/CreativeLabView'
 import { MockupsView } from './sections/mockups/MockupsView'
 import { PartnersView } from './sections/partners/PartnersView'
 import { SourcingView } from './sections/sourcing/SourcingView'
@@ -23,7 +24,8 @@ function App() {
   const { authStatus, authError, handleLogin, handleLogout } = useAdminAuth()
 
   // Tab state — single source of truth for which view is visible.
-  const [activeSection, setActiveSection] = useState<FashionOsSection>('Sourcing')
+  // Default to Mockup Studio (the produce-first RHE entry point).
+  const [activeSection, setActiveSection] = useState<FashionOsSection>('MockupStudio')
 
   // Partners cluster — owned here because Sourcing imports records into the same store.
   const [records, setRecords] = useState<Manufactory[]>([])
@@ -35,8 +37,13 @@ function App() {
   const [statusFilter, setStatusFilter] = useState<'Alle' | PipelineStatus>('Alle')
   const [formOpen, setFormOpen] = useState(false)
 
-  // Sourcing and Mockups own their internal state inside their views (RHE pattern).
-  // All three views are permanently mounted and toggled via the `hidden`
+  // Cross-tab handoff: Creative Lab generates a prompt → Mockup Studio reads it on next render.
+  // The Mockup Studio view calls `onPromptConsumed` after applying the prompt so we don't
+  // overwrite the user's edits on subsequent tab toggles.
+  const [pendingMockupPrompt, setPendingMockupPrompt] = useState('')
+
+  // Sourcing / Mockups / Creative-Lab each own their internal state inside their views.
+  // All four panels stay permanently mounted and are toggled via the `hidden`
   // attribute so internal state survives tab switches.
 
   const filteredRecords = useMemo(() => {
@@ -158,6 +165,11 @@ function App() {
     setFormOpen(false)
   }
 
+  function sendPromptToMockupStudio(prompt: string) {
+    setPendingMockupPrompt(prompt)
+    changeSection('MockupStudio')
+  }
+
   return (
     <AuthGate status={authStatus} error={authError} onLogin={handleLogin}>
       <AppShell
@@ -183,10 +195,29 @@ function App() {
         }
       >
         <div
-          id="tabpanel-sourcing"
+          id="tabpanel-mockupstudio"
           role="tabpanel"
-          aria-labelledby="tab-sourcing"
-          hidden={activeSection !== 'Sourcing'}
+          aria-labelledby="tab-mockupstudio"
+          hidden={activeSection !== 'MockupStudio'}
+        >
+          <MockupsView
+            pendingPrompt={pendingMockupPrompt}
+            onPromptConsumed={() => setPendingMockupPrompt('')}
+          />
+        </div>
+        <div
+          id="tabpanel-creativelab"
+          role="tabpanel"
+          aria-labelledby="tab-creativelab"
+          hidden={activeSection !== 'CreativeLab'}
+        >
+          <CreativeLabView onSendToMockupStudio={sendPromptToMockupStudio} />
+        </div>
+        <div
+          id="tabpanel-manufakturscout"
+          role="tabpanel"
+          aria-labelledby="tab-manufakturscout"
+          hidden={activeSection !== 'ManufakturScout'}
         >
           <SourcingView onAiImport={saveImportedRecords} onBulkImport={saveImportedRecords} />
         </div>
@@ -209,14 +240,6 @@ function App() {
             }}
             onDelete={removeRecord}
           />
-        </div>
-        <div
-          id="tabpanel-mockups"
-          role="tabpanel"
-          aria-labelledby="tab-mockups"
-          hidden={activeSection !== 'Mockups'}
-        >
-          <MockupsView />
         </div>
       </AppShell>
       {formOpen && (

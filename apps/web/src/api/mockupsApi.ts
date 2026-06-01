@@ -6,6 +6,8 @@ import type {
   MockupJobsResponse,
 } from '@agorase/shared'
 
+export type { GenerateMockupRequest } from '@agorase/shared'
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
 
 export interface MockupJobListFilters {

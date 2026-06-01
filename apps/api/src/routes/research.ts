@@ -23,6 +23,7 @@ function normalizeResearchRequest(body: Partial<PartnerResearchRequest>): Partne
     productFocus: normalizeText(body.productFocus),
     priceLevel: priceLevels.includes(body.priceLevel ?? 'Alle') ? (body.priceLevel ?? 'Alle') : 'Alle',
     count: clampCount(Number(body.count)),
+    europeFocus: typeof body.europeFocus === 'boolean' ? body.europeFocus : false,
   }
 }
 

@@ -1249,3 +1249,190 @@ label {
   background: var(--ink);
   color: var(--canvas);
 }
+
+/* RHE Phase 6 additions — score badges, verification pills, mockup quality report */
+
+.scout-score {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 12px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--canvas);
+}
+
+.scout-score.ready {
+  background: #1b6e2b;
+}
+
+.scout-score.review {
+  background: #a06b00;
+}
+
+.scout-score.blocked {
+  background: #8b1b1b;
+}
+
+.scout-verification {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.scout-verify-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.scout-verify-row dt {
+  width: 110px;
+  color: #555;
+}
+
+.scout-verify-row dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.scout-verify-row dd > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verify-pill {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 11px;
+  border-radius: 999px;
+  border: 1px solid #ccc;
+  background: #fffdf8;
+}
+
+.verify-pill.verified {
+  border-color: #1b6e2b;
+  color: #1b6e2b;
+}
+
+.verify-pill.partial {
+  border-color: #a06b00;
+  color: #a06b00;
+}
+
+.verify-pill.unverified {
+  border-color: #8b1b1b;
+  color: #8b1b1b;
+}
+
+.scout-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: #a06b00;
+}
+
+.europe-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.europe-toggle input[type='checkbox'] {
+  margin: 0;
+}
+
+.mockup-quality-report {
+  border: 1px solid #e7e1d2;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fffdf8;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.mockup-quality-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mockup-quality-header strong {
+  font-size: 20px;
+}
+
+.quality-badge {
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--canvas);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.quality-badge.ready {
+  background: #1b6e2b;
+}
+
+.quality-badge.review {
+  background: #a06b00;
+}
+
+.quality-badge.blocked {
+  background: #8b1b1b;
+}
+
+.mockup-quality-checks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mockup-quality-checks li {
+  display: grid;
+  grid-template-columns: 12px 120px 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.check-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ccc;
+}
+
+.check-dot.ready {
+  background: #1b6e2b;
+}
+
+.check-dot.review {
+  background: #a06b00;
+}
+
+.check-dot.blocked {
+  background: #8b1b1b;
+}
+
+.creative-lab-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

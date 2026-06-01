@@ -38,6 +38,17 @@ const job: MockupJob = {
   briefId: 'brief-1',
   notes: 'Initial pass',
   referenceImages: [sampleReference],
+  productMode: 'Hoodie',
+  imageMode: 'Model-Shot',
+  garmentColor: 'Washed Black',
+  fabric: '420 GSM brushed cotton fleece',
+  printMethod: 'Screenprint',
+  placement: 'Brust + grosser Rueckenprint',
+  designText: 'KINGS',
+  typographyPreset: 'Bold Condensed Sans',
+  typographyFreeform: 'bold condensed sans-serif streetwear lettering',
+  printFields: { front: '20cm', back: '40cm', sleeve: '', printSizeCm: '' },
+  qualityReport: null,
   createdAt: '2026-05-15T00:00:00.000Z',
   updatedAt: '2026-05-15T00:00:00.000Z',
 }
@@ -178,10 +189,47 @@ describe('mockupJobsRepository', () => {
   it('serializes reference images as JSON when upserting', async () => {
     const pool = fakePool([{ rows: [rowFromJob(job)] }])
     await upsertMockupJob(pool, job)
+    const sql = pool.calls[0]?.sql ?? ''
     const values = pool.calls[0]?.values ?? []
-    const referencesValue = values[values.length - 1]
+    // Find the reference_images column position (insert column order matches `columns` array).
+    const columnList = sql
+      .replace(/[\s\S]*insert into mockup_jobs \(/, '')
+      .replace(/\)[\s\S]*$/, '')
+      .split(',')
+      .map((column) => column.trim())
+    const referencesIndex = columnList.indexOf('reference_images')
+    expect(referencesIndex).toBeGreaterThanOrEqual(0)
+    const referencesValue = values[referencesIndex]
     expect(typeof referencesValue).toBe('string')
     expect(JSON.parse(referencesValue as string)).toEqual([sampleReference])
+  })
+
+  it('serializes print fields and round-trips quality report through row mapping', async () => {
+    const reportJob: MockupJob = {
+      ...job,
+      qualityReport: {
+        score: 78,
+        status: 'ready',
+        summary: 'Solid mockup.',
+        checks: [{ label: 'Fit', status: 'ready', note: 'Good.' }],
+        recommendations: ['Push contrast.'],
+      },
+    }
+    const pool = fakePool([{ rows: [rowFromJob(reportJob)] }])
+    await upsertMockupJob(pool, reportJob)
+    const sql = pool.calls[0]?.sql ?? ''
+    const values = pool.calls[0]?.values ?? []
+    const columnList = sql
+      .replace(/[\s\S]*insert into mockup_jobs \(/, '')
+      .replace(/\)[\s\S]*$/, '')
+      .split(',')
+      .map((column) => column.trim())
+    const printIndex = columnList.indexOf('print_fields')
+    expect(typeof values[printIndex]).toBe('string')
+    expect(JSON.parse(values[printIndex] as string)).toMatchObject({ front: '20cm', back: '40cm' })
+    const qualityIndex = columnList.indexOf('quality_report')
+    expect(typeof values[qualityIndex]).toBe('string')
+    expect(JSON.parse(values[qualityIndex] as string)).toMatchObject({ score: 78, status: 'ready' })
   })
 
   it('gets a job by id', async () => {
@@ -225,6 +273,17 @@ function rowFromJob(value: MockupJob): Row {
     brief_id: value.briefId,
     notes: value.notes,
     reference_images: value.referenceImages,
+    product_mode: value.productMode,
+    image_mode: value.imageMode,
+    garment_color: value.garmentColor,
+    fabric: value.fabric,
+    print_method: value.printMethod,
+    placement: value.placement,
+    design_text: value.designText,
+    typography_preset: value.typographyPreset,
+    typography_freeform: value.typographyFreeform,
+    print_fields: value.printFields,
+    quality_report: value.qualityReport,
     created_at: value.createdAt,
     updated_at: value.updatedAt,
   }
